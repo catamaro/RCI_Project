@@ -17,15 +17,16 @@
 
 #define N 32
 
-typedef struct
+//struct with information of server state
+typedef struct relations
 {
-    int node_key;
+    int node_key = 0; //key of the server
     char node_IP[16];
     char node_TCP[8];
-    int succ_key;
+    int succ_key; //key of the server 1st sucessor
     char succ_IP[16];
     char succ_TCP[8];
-    int succ2_key;
+    int succ2_key; //key of the server 2nd sucessor
     char succ2_IP[16];
     char succ2_TCP[8];
 } relations;
@@ -39,5 +40,8 @@ int TCP_SERVER (char* port);
 int UDP_SERVER (char* port);
 
 void interface_utilizador(char* comando_utilizador, char* IP, char* port);
+
+void new(char* comando_utilizador, char* IP, char* port);
+
 
 #endif
