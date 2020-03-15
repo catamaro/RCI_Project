@@ -20,7 +20,7 @@
 //struct with information of server state
 typedef struct relations
 {
-    int node_key = 0; //key of the server
+    int node_key; //key of the server
     char node_IP[16];
     char node_TCP[8];
     int succ_key; //key of the server 1st sucessor
@@ -39,7 +39,7 @@ int TCP_SERVER (char* port);
 
 int UDP_SERVER (char* port);
 
-void interface_utilizador(char* comando_utilizador, char* IP, char* port);
+int interface_utilizador(char* comando_utilizador, char* IP, char* port);
 
 void new(char* comando_utilizador, char* IP, char* port);
 

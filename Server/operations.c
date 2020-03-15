@@ -1,42 +1,63 @@
 #include "connect.h"
 
-void interface_utilizador(char* comando_utilizador, char* IP, char* port){
+int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 
 	char buffer[1024];
 
     if (sscanf(comando_utilizador, "%s", buffer) == 1){
-
-			printf("new\n");
-
+		
 		//create ring if "new i" is typed
 		if(strcmp(buffer, "new") == 0){
+			//check if already on the ring
+			if(server_state.node_key != 0){
+				printf("error: before the command <new> use the command <leave> to exit the current ring\n");
+				return 1;
+			}
 			new(comando_utilizador, IP, port);
 		}
+
 		//add new server without search
 		else if(strcmp(buffer, "sentry") == 0){
+			//check if already on the ring
+			if(server_state.node_key != 0){
+				printf("error: server already on the ring\n");
+				return 1;
+			}
 			//loading...
 		}
+
 		//add new server with search
 		else if(strcmp(buffer, "entry") == 0){
+			//check if already on the ring
+			if(server_state.node_key != 0){
+				printf("error: server already on the ring\n");
+				return 1;
+			}
 			//loading...
 		}
+
 		else if(strcmp(buffer, "leave") == 0){
 			//loading...
 		}
+
 		else if(strcmp(buffer, "show") == 0){
 			//loading...
 		}
+
 		else if(strcmp(buffer, "find") == 0){
 			//loading...
 		}
+
 		else if(strcmp(buffer, "exit") == 0){
 			//loading...
 		}
+
 		else{
 			printf("error: invalid input\n");
-			exit(1);
+			return 1;
 		}
 	}
+	return 0;
 }
 
 void new(char* comando_utilizador, char* IP, char* port){
@@ -47,7 +68,7 @@ void new(char* comando_utilizador, char* IP, char* port){
 	if (sscanf(comando_utilizador, "%s %d", buffer, &node_key) == 2){
 		if(node_key > 32){
 			printf("i cannot overcome %d\n", N);
-			exit(1);
+			return;
 		}
 		server_state.node_key = node_key; 
 		strcpy(server_state.node_IP, IP); 

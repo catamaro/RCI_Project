@@ -11,7 +11,6 @@ int main(int argc, char *argv[]){
 	fd_set read_fds;
 	int maxfd,retval;
     int size;
-
 	char IP[128], port[128];
 	
 	//exit when wrong #arguments
@@ -28,6 +27,8 @@ int main(int argc, char *argv[]){
 	//inicialize TCP and UDP comunication for 1st server
     fd_server_tcp = TCP_SERVER(port);
     fd_server_udp = UDP_SERVER(port);
+	//init node_key to default
+	server_state.node_key = 0;
 
 	while(1){
 		//reset set of read file descriptors
