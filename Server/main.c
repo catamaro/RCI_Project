@@ -28,7 +28,7 @@ int main(int argc, char *argv[]){
     fd_server_tcp = TCP_SERVER(port);
     fd_server_udp = UDP_SERVER(port);
 	//init node_key to default
-	server_state.node_key = 0;
+	server_state.node_key = -1;
 
 	while(1){
 		//reset set of read file descriptors
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]){
         //read from keyboard if ready
 		if(FD_ISSET(STDIN_FILENO,&read_fds)){
 			if(fgets(fgets_buffer, 1024, stdin) == NULL){
-				printf("error reading from keyboard\n");
+				printf("error: reading from keyboard\n");
 				exit(1);
 			}
 			

@@ -9,7 +9,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 		//create ring if "new i" is typed
 		if(strcmp(buffer, "new") == 0){
 			//check if already on the ring
-			if(server_state.node_key != 0){
+			if(server_state.node_key != -1){
 				printf("error: before the command <new> use the command <leave> to exit the current ring\n");
 				return 1;
 			}
@@ -19,7 +19,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 		//add new server without search
 		else if(strcmp(buffer, "sentry") == 0){
 			//check if already on the ring
-			if(server_state.node_key != 0){
+			if(server_state.node_key != -1){
 				printf("error: server already on the ring\n");
 				return 1;
 			}
@@ -29,7 +29,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 		//add new server with search
 		else if(strcmp(buffer, "entry") == 0){
 			//check if already on the ring
-			if(server_state.node_key != 0){
+			if(server_state.node_key != -1){
 				printf("error: server already on the ring\n");
 				return 1;
 			}
