@@ -2,12 +2,13 @@
 
 int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 
+	int fd;
 	char buffer[1024];
 
     if (sscanf(comando_utilizador, "%s", buffer) == 1){
 		
 		//create ring if "new i" is typed
-		if(strcmp(buffer, "new") == 0){
+		if(server_state.node_key != -1){
 			//check if already on the ring
 			if(server_state.node_key != -1){
 				printf("error: before the command <new> use the command <leave> to exit the current ring\n");
@@ -23,7 +24,8 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				printf("error: server already on the ring\n");
 				return -1;
 			}
-			//loading...
+			fd = sentry(comando_utilizador, IP, port);
+			return fd;		
 		}
 
 		//add new server with search
@@ -97,4 +99,33 @@ void new(char* comando_utilizador, char* IP, char* port){
 		printf("error: command of type new <i>\n");
 		return;
 	}
+}
+
+
+int sentry(char* comando_utilizador, char* IP, char* port){
+	int node_key, node_key_succi;
+	char IP_succi[128], port_succi[128], buffer;
+	int fd = -1;
+
+	if (sscanf(comando_utilizador, "%s %d %d %s %s", buffer, &node_key, &node_key_succi, IP_succi, port_succi) == 5){
+		if(node_key > 32){
+			printf("i cannot overcome %d\n", N);
+			return;
+		}
+
+		fd = TCP_CLIENT(IP, port);
+
+		server_state.node_key = node_key; 
+		strcpy(server_state.node_IP, IP); 
+		strcpy(server_state.node_TCP, port); 
+		server_state.succ_key = node_key_succi; 
+		strcpy(server_state.succ_IP, IP_succi); 
+		strcpy(server_state.succ_TCP, port_succi); 
+		server_state.succ2_key = node_key_succi; 
+		strcpy(server_state.succ2_IP, IP_succi); 
+		strcpy(server_state.succ2_TCP, port_succi);
+	}
+
+	return fd;
+
 }

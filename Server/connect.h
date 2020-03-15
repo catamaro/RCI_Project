@@ -33,7 +33,7 @@ typedef struct relations
 
 relations server_state;
 
-int TCP_CLIENT ();
+int TCP_CLIENT (char* IP, char* port);
 
 int TCP_SERVER (char* port);
 
@@ -43,5 +43,6 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port);
 
 void new(char* comando_utilizador, char* IP, char* port);
 
+int sentry(char* comando_utilizador, char* IP, char* port);
 
 #endif
