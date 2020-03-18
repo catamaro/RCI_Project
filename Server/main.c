@@ -15,7 +15,7 @@ int main(int argc, char *argv[]){
 	
 	//exit when wrong #arguments
 	if(argc != 3){
-		write(1,"error: command of type dkt <IP> <port>\n", 16);
+		printf("error: command of type dkt <IP> <port>\n");
 		exit(1);
 	}
 	//save IP and Port if right #arguments
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]){
 			}
 			
    			//activate action(e.g., new i)
-			interface_utilizador(fgets_buffer, IP, port);
+			comunication_tcp_fd = interface_utilizador(fgets_buffer, IP, port);
 		}
 
 		//create tcp connection if ready
@@ -80,13 +80,13 @@ int main(int argc, char *argv[]){
 		{
 			if((n=read(comunication_tcp_fd,buffer,128))!=0)
 			{
-				/*to test tcp connetcion
+				//to test tcp connetcion
 				if(n==-1)exit(1);
 				write(1,"tcp_received: ",14);
 				write(1,buffer,n);
 				
 				n=write(comunication_tcp_fd,buffer,n);
-				if(n==-1)exit(1);*/
+				if(n==-1)exit(1);
 			}
 			else{close(comunication_tcp_fd);}//connection closed by peer
 		}
