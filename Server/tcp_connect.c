@@ -1,6 +1,6 @@
 #include "connect.h"
     
-int TCP_CLIENT (){
+int TCP_CLIENT (char* IP, char* port){
     
     int fd;
     ssize_t n;
@@ -9,7 +9,10 @@ int TCP_CLIENT (){
     struct sigaction act;
 
     fd=socket(AF_INET,SOCK_STREAM,0);//TCP socket
-	if(fd==-1){perror("tcp socket err:");exit(1);}
+	if(fd==-1){
+        perror("tcp socket err:");
+        return -1;
+    }
 
     memset(&hints,0,sizeof hints);
     hints.ai_family=AF_INET;//IPv4
@@ -18,13 +21,19 @@ int TCP_CLIENT (){
     memset(&act,0,sizeof act);
 	act.sa_handler=SIG_IGN;
 
-	if(sigaction(SIGPIPE,&act,NULL)==-1)/*error*/exit(1);
+	if(sigaction(SIGPIPE,&act,NULL) == -1) return -1;
 
-    n = getaddrinfo ("127.0.1.1","58001", &hints, &res); // localhost vai ser tejo ou enedereço do pai
-    if(n!=0){perror("tcp getaddrinfo err:");exit(1);}
+    n = getaddrinfo (IP, port, &hints, &res); 
+    if(n!=0){
+        perror("tcp getaddrinfo err:");
+        return -1;
+    }
    
     n = connect (fd, res->ai_addr, res->ai_addrlen);
-    if(n==-1){perror("fonte err:");exit(1);}
+    if(n==-1){
+        perror("fonte err:");
+        return -1;
+    }
   	
 	return fd;      
 }
@@ -38,7 +47,10 @@ int TCP_SERVER (char* port){
     struct sigaction act;
 
     fd=socket(AF_INET,SOCK_STREAM,0);//TCP socket
-	if(fd==-1){perror("tcp socket err:");exit(1);}
+	if(fd==-1){
+        perror("tcp socket err:");
+        return -1;
+    }
 
 	memset(&hints,0,sizeof hints);
 	hints.ai_family=AF_INET;//IPv4
@@ -48,19 +60,53 @@ int TCP_SERVER (char* port){
     memset(&act,0,sizeof act);
 	act.sa_handler=SIG_IGN;
 
-	if(sigaction(SIGPIPE,&act,NULL)==-1)/*error*/exit(1);
+	if(sigaction(SIGPIPE,&act,NULL)==-1) return -1;
 
     n = getaddrinfo (NULL,port,&hints,&res); // localhost vai ser tejo ou enedereço do pai
-    if(n!=0){perror("tcp getaddrinfo err:");exit(1);}
+    if(n!=0){
+        perror("tcp getaddrinfo err:");
+        return -1;;
+    }
 
 	n = bind (fd,res->ai_addr,res->ai_addrlen);
-    if(n==-1){perror("bind err:");exit(1);}
+    if(n==-1){
+        perror("bind err:");
+        return -1;
+    }
 
 	n = listen (fd,5);
-    if(n==-1){perror("listen err:");exit(1);}
+    if(n==-1){
+        perror("listen err:");
+        return -1;
+    }
   	
 	return fd;      
 }
+
+int UDP_CLIENT(char* IP, char* port){
+
+    fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
+    if (fd == -1)                       
+        exit(1);
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;      //IPv4
+    hints.ai_socktype = SOCK_DGRAM; //UDP socket
+    errcode = getaddrinfo("tejo.tecnico.ulisboa.pt", PORT, &hints, &res);
+    if (errcode != 0) 
+        exit(1);
+    n = sendto(fd, "Hello!\n", 7, 0, res->ai_addr, res->ai_addrlen);
+    if (n == -1) /*error*/
+        exit(1);
+    addrlen = sizeof(addr);
+    n = recvfrom(fd, buffer, 128, 0,
+                 (struct sockaddr *)&addr, &addrlen);
+    if (n == -1) 
+    write(1, "echo: ", 6);
+    write(1, buffer, n);
+    freeaddrinfo(res);
+    close(fd);
+}
+
 
 int UDP_SERVER (char* port){
     
@@ -71,7 +117,10 @@ int UDP_SERVER (char* port){
     struct sigaction act;
 
     fd=socket(AF_INET,SOCK_DGRAM,0);//UDP socket
-	if(fd==-1){perror("tcp socket err:");exit(1);}
+	if(fd==-1){
+        perror("tcp socket err:");
+        return -1;
+    }
 
 	memset(&hints,0,sizeof hints);
 	hints.ai_family=AF_INET;//IPv4
@@ -81,13 +130,19 @@ int UDP_SERVER (char* port){
     memset(&act,0,sizeof act);
 	act.sa_handler=SIG_IGN;
 
-	if(sigaction(SIGPIPE,&act,NULL)==-1)/*error*/exit(1);
+	if(sigaction(SIGPIPE,&act,NULL)==-1) return -1;;
 
     n = getaddrinfo (NULL,port,&hints,&res); // localhost vai ser tejo ou enedereço do pai
-    if(n!=0){perror("udp getaddrinfo err:");exit(1);}
+    if(n!=0){
+        perror("udp getaddrinfo err:");
+        return -1;
+    }
 
 	n = bind (fd,res->ai_addr,res->ai_addrlen);
-    if(n==-1){perror("bind err:");exit(1);}
+    if(n==-1){
+        perror("bind err:");
+        return -1;
+    }
   	
 	return fd;      
 }

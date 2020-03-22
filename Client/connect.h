@@ -38,8 +38,6 @@ relations auxiliar;
 
 int TCP_CLIENT (char* IP, char* port);
 
-int UDP_CLIENT (char* IP, char* port);
-
 int TCP_SERVER (char* port);
 
 int UDP_SERVER (char* port);

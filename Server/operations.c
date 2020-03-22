@@ -1,20 +1,23 @@
 #include "connect.h"
 
 int interface_utilizador(char* comando_utilizador, char* IP, char* port){
-
-	int fd;
-	char buffer[1024];
+	char buffer[128];
 
     if (sscanf(comando_utilizador, "%s", buffer) == 1){
 		
 		//create ring if "new i" is typed
-		if(server_state.node_key != -1){
+		if(strcmp(buffer, "new") == 0){
 			//check if already on the ring
 			if(server_state.node_key != -1){
 				printf("error: before the command <new> use the command <leave> to exit the current ring\n");
 				return -1;
 			}
-			new(comando_utilizador, IP, port);
+			else if(new(comando_utilizador, IP, port) == 0)
+				return -2;
+			else{
+				printf("error: cannot perform <new>\n");
+				return -1;
+			}
 		}
 
 		//add new server without search
@@ -24,8 +27,14 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				printf("error: server already on the ring\n");
 				return -1;
 			}
-			fd = sentry(comando_utilizador, IP, port);
-			return fd;		
+			else if(sentry(comando_utilizador, IP, port) == 0){
+				return -3;
+			}
+			else{
+				printf("error: cannot perform <sentry>\n");
+				return -1;
+			}
+			
 		}
 
 		//add new server with search
@@ -39,6 +48,10 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 		}
 
 		else if(strcmp(buffer, "leave") == 0){
+			if(server_state.node_key == -1){
+				printf("error: server is not on the ring\n");
+				return -1;
+			}
 			//loading...
 		}
 
@@ -49,9 +62,10 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				printf("Server -> key: %d   IP: %s   Port: %s\n", server_state.node_key, server_state.node_IP, server_state.node_TCP);
 				printf("Sucessor -> key: %d   IP: %s   Port: %s\n", server_state.succ_key, server_state.succ_IP, server_state.succ_TCP);
 				printf("Second sucessor -> key: %d   IP: %s   Port: %s\n", server_state.succ2_key, server_state.succ2_IP, server_state.succ2_TCP);
+				return -4;
 			}
 			else{
-				printf("error: server not on the ring type <new>, <entry> or <sentry> first\n");
+				printf("error: server not on the ring type <new>, <entry> or <sentry>\n");
 				return -1;
 			}
 		}
@@ -70,19 +84,19 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 		}
 	}
 
-	return 0;
+	return -1;
 }
 
-void new(char* comando_utilizador, char* IP, char* port){
-	int node_key = -1;
-	char buffer[1024];
+int new(char* comando_utilizador, char* IP, char* port){
+	int node_key;
+	char buffer[10];
 
 	//initiate ring with 1st server info 
 	if (sscanf(comando_utilizador, "%s %d", buffer, &node_key) == 2){
 		
 		if(node_key > 32){
 			printf("error: i cannot overcome %d\n", N);
-			return;
+			return -1;
 		}
 				
 		server_state.node_key = node_key; 
@@ -97,35 +111,71 @@ void new(char* comando_utilizador, char* IP, char* port){
 	}
 	else{
 		printf("error: command of type new <i>\n");
-		return;
+		return -1;
 	}
+	return 0;
 }
-
 
 int sentry(char* comando_utilizador, char* IP, char* port){
-	int node_key, node_key_succi;
-	char IP_succi[128], port_succi[128], buffer;
-	int fd = -1;
+	int node_key;
+	char buffer[10];
 
-	if (sscanf(comando_utilizador, "%s %d %d %s %s", buffer, &node_key, &node_key_succi, IP_succi, port_succi) == 5){
+	if (sscanf(comando_utilizador, "%s %d %d %s %s", buffer, &node_key, &server_state.succ_key, server_state.succ_IP, server_state.succ_TCP) == 5){
 		if(node_key > 32){
 			printf("i cannot overcome %d\n", N);
-			return;
+			return -1;
 		}
-
-		fd = TCP_CLIENT(IP, port);
-
+		//state of new server is updated
 		server_state.node_key = node_key; 
 		strcpy(server_state.node_IP, IP); 
-		strcpy(server_state.node_TCP, port); 
-		server_state.succ_key = node_key_succi; 
-		strcpy(server_state.succ_IP, IP_succi); 
-		strcpy(server_state.succ_TCP, port_succi); 
-		server_state.succ2_key = node_key_succi; 
-		strcpy(server_state.succ2_IP, IP_succi); 
-		strcpy(server_state.succ2_TCP, port_succi);
+		strcpy(server_state.node_TCP, port);
+		
+		//TCP connection created with sucessor
+		server_state.succ_fd = TCP_CLIENT(server_state.succ_IP, server_state.succ_TCP);
+		
+		//TCP connection sent do sucessor for update
+		NEW(server_state.succ_fd, node_key, IP, port);
 	}
-
-	return fd;
-
+	else{
+		printf("error: command of type sentry <i> <j> <IP_j> <port_j> \n");
+		return -1;
+	}
+	return 0;
 }
+
+void NEW(int fd, int node_key, char* IP, char* port){
+
+	size_t n;
+	char message[128];
+
+	sprintf(message, "NEW %d %s %s\n", node_key, IP, port);
+	n = strlen(message);
+	
+	n = write(fd,message,n);
+	if(n == -1)exit(1);
+}
+
+void SUCC(int fd, int node_key, char* IP, char* port){
+
+	size_t n;
+	char message[128];
+
+	sprintf(message, "SUCC %d %s %s\n", node_key, IP, port);
+	n = strlen(message);
+	
+	n = write(fd,message,n);
+	if(n==-1)exit(1);
+}
+
+void SUCCCONFIG(int fd){
+
+	size_t n;
+	char message[128];
+
+	strcpy(message, "SUCCCONFIG\n");
+	n = strlen(message);
+	
+	n = write(fd,message,n);
+	if(n==-1)exit(1);
+}
+
