@@ -37,27 +37,22 @@ relations server_state;
 relations auxiliar;
 
 int TCP_CLIENT (char* IP, char* port);
-
-int UDP_CLIENT (char* IP, char* port);
-
 int TCP_SERVER (char* port);
-
 int UDP_SERVER (char* port);
 
 int interface_utilizador(char* comando_utilizador, char* IP, char* port);
-
 int new(char* comando_utilizador, char* IP, char* port);
-
 int sentry(char* comando_utilizador, char* IP, char* port);
+int find(char* comando_utilizador);
+void send_message(int fd, int node_key, char* IP, char* port, char* comand);
+void send_find_message(int fd, int node_key, char* IP, char* port, char* comand, int search_key);
 
-void NEW(int fd, int node_key, char* IP, char* port);
-
-void SUCC(int fd, int node_key, char* IP, char* port);
-
-void SUCCCONFIG(int fd);
-
-int message_incoming_fd(char* buffer, int incoming_fd);
-int message_succ_fd(char* buffer);
+int message_incoming_fd(char* message, int incoming_fd);
+int message_succ_fd(char* message);
+int message_pred_fd(char* message);
+int succ_NEW(char* message);
+int succ_SUCC(char* message);
+int succ_FND(char* message);
 /*void message_pred_fd(char* buffer);*/
 
 #endif

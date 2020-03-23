@@ -1,8 +1,8 @@
-projeto: tcp_connection.o tcp_connect.o connect.h
-	gcc $(CFLAGS) -o tcp_con tcp_connection.o tcp_connect.o -lm
+projeto: client.o client.h
+	gcc $(CFLAGS) -o clt client.o -lm
 
-tcp_connect.o: tcp_connect.c connect.h
-	gcc $(CFLAGS) -c tcp_connect.c -lm
+client.o: client.c client.h
+	gcc $(CFLAGS) -c client.c -lm
 
 clean:
 	rm -f *.o *.~ dkt *.gch

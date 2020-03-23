@@ -69,11 +69,14 @@ int main(int argc, char *argv[]){
 			FD_SET(pred_fd,&read_fds);
         	maxfd = max(maxfd,pred_fd);
 		}
-		
+
 		//blocks until one fd is ready to read **or until timer ends**
 		retval = select(maxfd+1,&read_fds,(fd_set*)NULL,(fd_set*)NULL,(struct timeval *)NULL);
-		if(retval <= 0)/*error*/exit(1);
-
+		if(retval <= 0){
+			printf("error: empty select");
+			exit(1);
+		}
+		
         //read from keyboard
 		if(FD_ISSET(STDIN_FILENO,&read_fds)){
 			if(fgets(buffer, 128, stdin) == NULL){
@@ -82,10 +85,10 @@ int main(int argc, char *argv[]){
 			}
 			
 			//se retornar -2 o new funcionou mas como és o único serve no anel não existe succ e não vai dar set
-			retorno = interface_utilizador(buffer, IP, port);
-			if(retorno == -2) printf("Ring created successfully\n");
-			else if(retorno == -3) printf("Server entered successfully on the ring\n");
-			else if(retorno == -4) printf("Show completed\n");
+			retval = interface_utilizador(buffer, IP, port);
+			if(retval == -2) printf("Ring created successfully\n");
+			else if(retval == -3) printf("Server entered successfully on the ring\n");
+			else if(retval == -4) printf("Show completed\n");
 				
 		}
 		//receive message from new server
@@ -94,8 +97,10 @@ int main(int argc, char *argv[]){
 			{
 				if((n = read(incoming_fd,buffer,128)) != 0)
 				{
-					printf("alguém me mandou esta mensagem: %s", buffer);
-					if(n==-1)exit(1);
+					if(n==-1){
+						printf("error: cannot read from keyboard");
+						exit(1);
+					}
 					message_incoming_fd(buffer, incoming_fd);
 					incoming_fd = -1;
 				}
@@ -107,48 +112,53 @@ int main(int argc, char *argv[]){
 		if(succ_fd != -1){
 			if(FD_ISSET(succ_fd,&read_fds)){
 				if((n = read(succ_fd,buffer,128)) != 0){
-					if(n==-1)exit(1);
+					if(n==-1){
+						printf("error: cannot read message from sucessor");
+						exit(1);
+					}
 					message_succ_fd(buffer);
 				}
 				else
 					close(succ_fd);//connection closed by peer
 			}
 		}
-
-		//receive tcp message
-		/*if(pred_fd != -1){
+		//receive tcp message from predecessor
+		if(pred_fd != -1){
 			if(FD_ISSET(pred_fd,&read_fds))
 			{
 				if((n=read(pred_fd,buffer,128))!=0)
 				{
-					if(n==-1)exit(1);
+					if(n==-1){
+						printf("error: cannot read message from predecessor");
+						exit(1);
+					}
 					message_pred_fd(buffer);
 				}
-				else{close(incoming_fd);}//connection closed by peer
+				else
+					close(pred_fd);//connection closed by peer
 			}
-		}*/
-
-		//receive udp message
-		if(FD_ISSET(fd_server_udp,&read_fds))
-		{
-			n = recvfrom(fd_server_udp,buffer,128,0,(struct sockaddr*)&addr,&addrlen);
-			if(n==-1)exit(1);
-			printf("udp_received: %s from: %s %d", buffer, (struct sockaddr*)&addr.sin_addr, (struct sockaddr*)&addr.sin_port);
-			retorno = interface_utilizador(buffer, (struct sockaddr*)&addr.sin_addr , (struct sockaddr*)&addr.sin_port);
-
-			n = sendto(fd_server_udp,buffer,n,0,(struct sockaddr*)&addr,addrlen);
-			if(n==-1)exit(1);
 		}
-
 		//create tcp connection
 		if(FD_ISSET(fd_server_tcp,&read_fds))
 		{	
 			addrlen = sizeof(addr);
 			incoming_fd = accept(fd_server_tcp,(struct sockaddr*)&addr,&addrlen);
-			if(incoming_fd == -1)exit(1);
-			printf("Recebi uma nova conexão tcp\n");
+			if(incoming_fd == -1){
+				printf("error: cannot read message from incoming fd");
+				exit(1);
+			}
 		}
+		//receive udp message
+		if(FD_ISSET(fd_server_udp,&read_fds))
+		{
+			n = recvfrom(fd_server_udp,buffer,128,0,(struct sockaddr*)&addr,&addrlen);
+			if(n==-1)exit(1);
 
+			printf("udp_received: %s", buffer);
+			retval = interface_utilizador(buffer, NULL, NULL);
+			//n = sendto(fd_server_udp,"Key is being searched\n",n,0,(struct sockaddr*)&addr,addrlen);
+
+		}
 	}
 
 	close(fd_server_udp);

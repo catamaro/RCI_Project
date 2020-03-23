@@ -2,8 +2,9 @@
 
 int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 	char buffer[128];
+	int search_key;
 
-    if (sscanf(comando_utilizador, "%s", buffer) == 1){
+    if(sscanf(comando_utilizador, "%s", buffer) == 1){
 		
 		//create ring if "new i" is typed
 		if(strcmp(buffer, "new") == 0){
@@ -36,25 +37,6 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 			}
 			
 		}
-
-		//add new server with search
-		else if(strcmp(buffer, "entry") == 0){
-			//check if already on the ring
-			if(server_state.node_key != -1){
-				printf("error: server already on the ring\n");
-				return -1;
-			}
-			//loading...
-		}
-
-		else if(strcmp(buffer, "leave") == 0){
-			if(server_state.node_key == -1){
-				printf("error: server is not on the ring\n");
-				return -1;
-			}
-			//loading...
-		}
-
 		else if(strcmp(buffer, "show") == 0){
 			//check if already on the ring
 			if(server_state.node_key != -1){
@@ -69,15 +51,42 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				return -1;
 			}
 		}
-
 		else if(strcmp(buffer, "find") == 0){
+			//check if already on the ring
+			if(server_state.node_key == -1){
+				printf("error: server is not on the ring\n");
+				return -1;
+			}
+			else if(find(comando_utilizador) == 0)
+				return -5;
+			else{
+				printf("error: cannot perform <find>\n");
+				return -1;
+			}
+		}
+		else if(strcmp(buffer, "entry") == 0){
+			//check if already on the ring
+			if(server_state.node_key != -1){
+				printf("error: server already on the ring\n");
+				return -1;
+			}
 			//loading...
 		}
-
+		else if(strcmp(buffer, "leave") == 0){
+			//check if already on the ring
+			if(server_state.node_key == -1){
+				printf("error: server is not on the ring\n");
+				return -1;
+			}
+			//loading...
+		}
 		else if(strcmp(buffer, "exit") == 0){
+			if(server_state.node_key == -1){
+				printf("error: server is not on the ring\n");
+				return -1;
+			}
 			//loading...
 		}
-
 		else{
 			printf("error: invalid input\n");
 			return -1;
@@ -134,7 +143,7 @@ int sentry(char* comando_utilizador, char* IP, char* port){
 		server_state.succ_fd = TCP_CLIENT(server_state.succ_IP, server_state.succ_TCP);
 		
 		//TCP connection sent do sucessor for update
-		NEW(server_state.succ_fd, node_key, IP, port);
+		send_message(server_state.succ_fd, node_key, IP, port, "NEW");
 	}
 	else{
 		printf("error: command of type sentry <i> <j> <IP_j> <port_j> \n");
@@ -143,39 +152,63 @@ int sentry(char* comando_utilizador, char* IP, char* port){
 	return 0;
 }
 
-void NEW(int fd, int node_key, char* IP, char* port){
+int find(char* comando_utilizador){
+
+	int search_key, dis_act, dis_succ;
+	char buffer[10];
+
+	if(sscanf(comando_utilizador, "%s %d", buffer, &search_key) == 2){
+		if(search_key > N){
+			printf("i cannot overcome %d\n", N);
+			return -1;
+		}
+
+		dis_act = N-search_key+server_state.node_key;
+		dis_succ = N-search_key+server_state.succ_key;
+		if(dis_succ > N) dis_succ -= 32;
+		
+		if(dis_succ > dis_act){
+			send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);			
+		}
+		else{
+			printf("Key %d is stored on server -> key: %d   IP: %s   Port: %s\n", search_key, server_state.node_key, server_state.node_IP, server_state.node_TCP);
+		}
+	}
+	else{
+		printf("error: command of type find <i>\n");
+		return -1;
+	}
+	return 0;
+}
+
+void send_message(int fd, int node_key, char* IP, char* port, char* comand){
 
 	size_t n;
 	char message[128];
 
-	sprintf(message, "NEW %d %s %s\n", node_key, IP, port);
+	if(strcmp(comand, "SUCCCONFIG") == 0) 
+		strcpy(message, "SUCCCONFIG\n");
+	else
+		sprintf(message, "%s %d %s %s\n", comand, node_key, IP, port);
+	
 	n = strlen(message);
 	
 	n = write(fd,message,n);
 	if(n == -1)exit(1);
 }
 
-void SUCC(int fd, int node_key, char* IP, char* port){
+void send_find_message(int fd, int node_key, char* IP, char* port, char* comand, int search_key){
 
 	size_t n;
 	char message[128];
 
-	sprintf(message, "SUCC %d %s %s\n", node_key, IP, port);
+	sprintf(message, "%s %d %d %s %s\n", comand, search_key, node_key, IP, port);
 	n = strlen(message);
+
+	printf("mensagem: %s\n", message);
 	
-	n = write(fd,message,n);
-	if(n==-1)exit(1);
+	n = write(fd, message, n);
+	if(n == -1)exit(1);
 }
 
-void SUCCCONFIG(int fd){
-
-	size_t n;
-	char message[128];
-
-	strcpy(message, "SUCCCONFIG\n");
-	n = strlen(message);
-	
-	n = write(fd,message,n);
-	if(n==-1)exit(1);
-}
 
