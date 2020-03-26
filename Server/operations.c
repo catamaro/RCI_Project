@@ -2,7 +2,6 @@
 
 int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 	char buffer[128];
-	int search_key;
 
     if(sscanf(comando_utilizador, "%s", buffer) == 1){
 		
@@ -78,14 +77,26 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				printf("error: server is not on the ring\n");
 				return -1;
 			}
-			//loading...
+			else if(leave() == 0){
+				return -6;
+			}
+			else{
+				printf("error: cannot perform <leave>\n");
+				return -1;
+			}			
 		}
 		else if(strcmp(buffer, "exit") == 0){
 			if(server_state.node_key == -1){
 				printf("error: server is not on the ring\n");
 				return -1;
 			}
-			//loading...
+			else if(leave() == 0){
+				return -7;
+			}
+			else{
+				printf("error: cannot perform <exit>\n");
+				return -1;
+			}
 		}
 		else{
 			printf("error: invalid input\n");
@@ -154,30 +165,44 @@ int sentry(char* comando_utilizador, char* IP, char* port){
 
 int find(char* comando_utilizador){
 
-	int search_key, dis_act, dis_succ;
+	int search_key;
 	char buffer[10];
 
 	if(sscanf(comando_utilizador, "%s %d", buffer, &search_key) == 2){
 		if(search_key > N){
-			printf("i cannot overcome %d\n", N);
+			printf("error: i cannot overcome %d\n", N);
 			return -1;
 		}
-
-		dis_act = N-search_key+server_state.node_key;
-		dis_succ = N-search_key+server_state.succ_key;
-		if(dis_succ > N) dis_succ -= 32;
 		
-		if(dis_succ > dis_act){
-			send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);			
+		if(server_state.succ_fd == -1){
+			send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);	
 		}
 		else{
-			printf("Key %d is stored on server -> key: %d   IP: %s   Port: %s\n", search_key, server_state.node_key, server_state.node_IP, server_state.node_TCP);
+			printf("error: there's no successor\n");
 		}
+
 	}
 	else{
 		printf("error: command of type find <i>\n");
 		return -1;
 	}
+	return 0;
+}
+
+int leave(){
+
+	close(server_state.succ_fd);
+	close(server_state.pred_fd);
+	server_state.succ_fd = -1;
+	server_state.pred_fd = -1;
+	server_state.node_key = -1; 
+	server_state.succ_key = -1; 
+	strcpy(server_state.succ_IP, "Not"); 
+	strcpy(server_state.succ_TCP, "Not"); 
+	server_state.succ2_key = -1; 
+	strcpy(server_state.succ2_IP, "Not"); 
+	strcpy(server_state.succ2_TCP, "Not");
+
 	return 0;
 }
 
@@ -205,8 +230,6 @@ void send_find_message(int fd, int node_key, char* IP, char* port, char* comand,
 	sprintf(message, "%s %d %d %s %s\n", comand, search_key, node_key, IP, port);
 	n = strlen(message);
 
-	printf("mensagem: %s\n", message);
-	
 	n = write(fd, message, n);
 	if(n == -1)exit(1);
 }

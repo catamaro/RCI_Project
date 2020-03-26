@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <stdio.h>
+#include <time.h>
 
 #define max(A,B) ((A)>=(B)?(A):(B))
 
@@ -44,15 +45,20 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port);
 int new(char* comando_utilizador, char* IP, char* port);
 int sentry(char* comando_utilizador, char* IP, char* port);
 int find(char* comando_utilizador);
+int leave();
 void send_message(int fd, int node_key, char* IP, char* port, char* comand);
 void send_find_message(int fd, int node_key, char* IP, char* port, char* comand, int search_key);
 
-int message_incoming_fd(char* message, int incoming_fd);
+int message_incoming_fd(char* message, int incoming_fd, int* flag_pred_out);
 int message_succ_fd(char* message);
 int message_pred_fd(char* message);
 int succ_NEW(char* message);
 int succ_SUCC(char* message);
 int succ_FND(char* message);
 /*void message_pred_fd(char* buffer);*/
+
+void delay(int m_seconds);
+
+int reconnection_succ();
 
 #endif

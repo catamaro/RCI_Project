@@ -9,8 +9,9 @@ int main(int argc, char *argv[]){
 	char buffer[128];
 	fd_set read_fds;
 	int maxfd,retval;
-	int retorno;
+	int flag_pred_out = 0;
 	char IP[128], port[128];
+
 	
 	//exit when wrong #arguments
 	if(argc != 3){
@@ -89,6 +90,12 @@ int main(int argc, char *argv[]){
 			if(retval == -2) printf("Ring created successfully\n");
 			else if(retval == -3) printf("Server entered successfully on the ring\n");
 			else if(retval == -4) printf("Show completed\n");
+			else if(retval == -7){
+				close(fd_server_udp);
+				close(fd_server_tcp);
+				close(incoming_fd);
+				return 0;
+			}
 				
 		}
 		//receive message from new server
@@ -101,11 +108,13 @@ int main(int argc, char *argv[]){
 						printf("error: cannot read from keyboard");
 						exit(1);
 					}
-					message_incoming_fd(buffer, incoming_fd);
+					message_incoming_fd(buffer, incoming_fd, &flag_pred_out);
 					incoming_fd = -1;
 				}
-				else 
+				else{
 					close(incoming_fd);//connection closed by peer
+					incoming_fd = -1;
+				}
 			}
 		}
 		//receive message from sucessor
@@ -118,8 +127,11 @@ int main(int argc, char *argv[]){
 					}
 					message_succ_fd(buffer);
 				}
-				else
+				else{
 					close(succ_fd);//connection closed by peer
+					server_state.succ_fd = -1;
+					reconnection_succ();
+				}
 			}
 		}
 		//receive tcp message from predecessor
@@ -134,8 +146,11 @@ int main(int argc, char *argv[]){
 					}
 					message_pred_fd(buffer);
 				}
-				else
+				else{
 					close(pred_fd);//connection closed by peer
+					server_state.pred_fd = -1;
+					flag_pred_out = 1;
+				}
 			}
 		}
 		//create tcp connection
@@ -149,7 +164,7 @@ int main(int argc, char *argv[]){
 			}
 		}
 		//receive udp message
-		if(FD_ISSET(fd_server_udp,&read_fds))
+		/*if(FD_ISSET(fd_server_udp,&read_fds))
 		{
 			n = recvfrom(fd_server_udp,buffer,128,0,(struct sockaddr*)&addr,&addrlen);
 			if(n==-1)exit(1);
@@ -158,10 +173,6 @@ int main(int argc, char *argv[]){
 			retval = interface_utilizador(buffer, NULL, NULL);
 			//n = sendto(fd_server_udp,"Key is being searched\n",n,0,(struct sockaddr*)&addr,addrlen);
 
-		}
+		}*/
 	}
-
-	close(fd_server_udp);
-	close(fd_server_tcp);
-	return 0;
 }
