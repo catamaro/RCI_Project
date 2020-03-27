@@ -1,10 +1,8 @@
-#include "connect.h"
+#include "main.h"
 
 int message_incoming_fd(char* message, int incoming_fd, int* flag_pred_out){
 	char buffer[128];
 	int search_key;
-
-	//printf("incoming mensagem: %s", message);
 
 	if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "NEW")==0)){
 		
@@ -40,6 +38,13 @@ int message_incoming_fd(char* message, int incoming_fd, int* flag_pred_out){
 			close(incoming_fd);
 		}
 	}
+	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "EKEY") == 0)){
+		if(sscanf(message, "%s %d %d %s %s", buffer, &search_key, &auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP) == 5){
+			printf("Ekey %d is stored on server -> key: %d   IP: %s   Port: %s\n", search_key, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP);
+			close(incoming_fd);
+			return -2;
+		}
+	}
 	else {
 		printf("error: incorrect message from new server\n");
 		return -1;
@@ -72,7 +77,8 @@ int message_pred_fd(char* message){
     char buffer[128];
 	//printf("pred mensagem: %s", message);
 
-    if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "FND") == 0)){
+    if (sscanf(message, "%s", buffer) == 1 && ( strcmp(buffer, "FND") == 0 || strcmp(buffer, "EFND") == 0) ){
+		printf("recebi mensagem do sucessor: %s", message);
 		succ_FND(message);
 	}
 	else{
@@ -81,6 +87,25 @@ int message_pred_fd(char* message){
 	}
 
 	return 0;
+}
+
+int message_udp(char* message){
+	char buffer[128];
+	int search_key;
+
+	if(sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "EFND") == 0)){
+		if(sscanf(message, "%s %d", buffer, &search_key) == 2){
+			printf("estou a enviar mensagem ao meu sucessor: %s", message);
+			send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "EFND", search_key);
+		}
+	}
+	else{
+		printf("error: incorrect message from udp connection\n");
+		return -1;
+	}
+
+	return 0;
+
 }
 
 int succ_SUCC(char* message){
@@ -144,12 +169,23 @@ int succ_FND(char* message){
 		if(dis_act < 0) dis_act += N;
 
 		if(dis_succ > dis_act){
-			send_find_message(server_state.succ_fd, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "FND", search_key);
+			if(strcmp(buffer, "EFND") == 0){
+				send_find_message(server_state.succ_fd, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "EFND", search_key);
+			}
+			else{
+				send_find_message(server_state.succ_fd, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "FND", search_key);
+			}
 		}
 		else{
 			auxiliar.succ_fd = TCP_CLIENT(auxiliar.node_IP, auxiliar.node_TCP);
-			if(auxiliar.succ_fd != -1) 
-				send_find_message(auxiliar.succ_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "KEY", search_key);
+			if(auxiliar.succ_fd != -1){
+				if(strcmp(buffer, "EFND") == 0){
+					send_find_message(auxiliar.succ_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "EKEY", search_key);
+				}
+				else{
+					send_find_message(auxiliar.succ_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "KEY", search_key);
+				}
+			}
 		}
 	}
 	else{
@@ -159,6 +195,45 @@ int succ_FND(char* message){
 
 	return 0;
 }
+
+/*int udp_EFND(char* message){
+	char buffer[128];
+	int search_key, dis_act, dis_succ;
+	struct addrinfo *res;
+	
+	if(sscanf(message, "%s %d", buffer, &search_key) == 2){
+		dis_act = server_state.node_key-search_key;
+		dis_succ = server_state.succ_key-search_key;
+		if(dis_succ < 0) dis_succ += N;
+		if(dis_act < 0) dis_act += N;
+		
+		if(dis_succ > dis_act){
+			send_find_message(server_state.succ_fd, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "EFND", search_key);
+		}
+		else{
+			auxiliar.succ_fd = TCP_CLIENT(auxiliar.node_IP, auxiliar.node_TCP);
+			if(auxiliar.succ_fd != -1){
+				send_find_message(auxiliar.succ_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "EKEY", search_key);
+			}
+		}
+
+		if(dis_succ > dis_act){
+			send_message_udp(server_state.succ_fd, auxiliar.node_key, "EFND", res);
+		}
+		else{
+			//auxiliar.succ_fd = UDP_CLIENT(auxiliar.node_IP, auxiliar.node_TCP, &());
+			if(auxiliar.succ_fd != -1){
+				send_message_udp(auxiliar.succ_fd, server_state.succ_key, "EKEY", res);
+			}
+		}
+	}
+	else{
+		printf("error: sscanf did not received the correct FND message\n");
+		return -1;
+	}	
+
+	return 0;
+}*/
 
 void delay(int m_seconds){
 

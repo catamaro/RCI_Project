@@ -1,4 +1,4 @@
-#include "connect.h"
+#include "main.h"
 
 int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 	char buffer[128];
@@ -69,7 +69,13 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				printf("error: server already on the ring\n");
 				return -1;
 			}
-			//loading...
+			else if(entry(comando_utilizador, IP, port) == 0){
+				return -6;
+			}
+			else{
+				printf("error: cannot perform <entry>\n");
+				return -1;
+			}
 		}
 		else if(strcmp(buffer, "leave") == 0){
 			//check if already on the ring
@@ -78,7 +84,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				return -1;
 			}
 			else if(leave() == 0){
-				return -6;
+				return -7;
 			}
 			else{
 				printf("error: cannot perform <leave>\n");
@@ -87,11 +93,10 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 		}
 		else if(strcmp(buffer, "exit") == 0){
 			if(server_state.node_key == -1){
-				printf("error: server is not on the ring\n");
-				return -1;
+				return -8;
 			}
 			else if(leave() == 0){
-				return -7;
+				return -8;
 			}
 			else{
 				printf("error: cannot perform <exit>\n");
@@ -174,7 +179,7 @@ int find(char* comando_utilizador){
 			return -1;
 		}
 		
-		if(server_state.succ_fd == -1){
+		if(server_state.succ_fd != -1){
 			send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);	
 		}
 		else{
@@ -186,6 +191,41 @@ int find(char* comando_utilizador){
 		printf("error: command of type find <i>\n");
 		return -1;
 	}
+	return 0;
+}
+
+int entry(char* comando_utilizador, char* IP, char* port){
+	int node_key, fd = 0;
+	struct addrinfo *res;
+	char buffer[128];
+	char message[128];
+
+	if (sscanf(comando_utilizador, "%s %d %d %s %s", buffer, &node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5){
+		if(node_key > 32){
+			printf("i cannot overcome %d\n", N);
+			return -1;
+		}
+
+		res = UDP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP, &fd);
+		send_message_udp(fd, node_key, res, NULL, NULL, "EFND", 0);
+
+		recvfrom(fd, message, 128, 0, (struct sockaddr*)res, &(res->ai_addrlen));
+		printf("mensagem recebida: %s\n", message);
+	}
+	else{
+		printf("error: command of type sentry <i> <j> <IP_j> <port_j> \n");
+		return -1;
+	}
+
+	if (sscanf(message, "%s %d %d %s %s", buffer, &node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5){
+		sprintf(message, "%s %d %d %s %s\n", "sentry", node_key, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP);
+		sentry(message, IP, port);
+	}
+	else{
+		printf("error: command of type EKEY <i> <j> <IP_j> <port_j> \n");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -219,7 +259,7 @@ void send_message(int fd, int node_key, char* IP, char* port, char* comand){
 	n = strlen(message);
 	
 	n = write(fd,message,n);
-	if(n == -1)exit(1);
+	if(n == -1) exit(1);
 }
 
 void send_find_message(int fd, int node_key, char* IP, char* port, char* comand, int search_key){
@@ -232,6 +272,22 @@ void send_find_message(int fd, int node_key, char* IP, char* port, char* comand,
 
 	n = write(fd, message, n);
 	if(n == -1)exit(1);
+}
+
+void send_message_udp(int fd, int node_key, struct addrinfo *res, char* IP, char* port, char* comand, int search_key){
+	size_t n;
+	char message[128];
+
+	if(strcmp(comand, "EFND") == 0) 
+		sprintf(message, "%s %d\n", comand, node_key);
+	else
+		sprintf(message, "%s %d %d %s %s\n", comand, search_key, node_key, IP, port);
+
+	printf("message: %s\n", message);
+	n = strlen(message);
+
+	n = sendto(fd,message,n,0,res->ai_addr,res->ai_addrlen);
+	if(n==-1) exit(1);
 }
 
 

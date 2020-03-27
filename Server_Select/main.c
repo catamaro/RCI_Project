@@ -1,11 +1,13 @@
-#include "connect.h"
+#include "main.h"
 
 int main(int argc, char *argv[]){
 
 	int fd_server_tcp, fd_server_udp,succ_fd = -1, incoming_fd = -1, pred_fd = -1;
 	ssize_t n;
 	struct sockaddr_in addr;
+	struct sockaddr_in udp_addr;
 	socklen_t addrlen;
+	socklen_t udp_addrlen = 0;
 	char buffer[128];
 	fd_set read_fds;
 	int maxfd,retval;
@@ -90,7 +92,9 @@ int main(int argc, char *argv[]){
 			if(retval == -2) printf("Ring created successfully\n");
 			else if(retval == -3) printf("Server entered successfully on the ring\n");
 			else if(retval == -4) printf("Show completed\n");
-			else if(retval == -7){
+			else if(retval == -6) printf("Server entered successfully on the ring\n");
+			else if(retval == -7) printf("Server leaved ring successfully\n");
+			else if(retval == -8){
 				close(fd_server_udp);
 				close(fd_server_tcp);
 				close(incoming_fd);
@@ -105,10 +109,12 @@ int main(int argc, char *argv[]){
 				if((n = read(incoming_fd,buffer,128)) != 0)
 				{
 					if(n==-1){
-						printf("error: cannot read from keyboard");
+						printf("error: cannot read from incoming fd");
 						exit(1);
 					}
-					message_incoming_fd(buffer, incoming_fd, &flag_pred_out);
+
+					retval = message_incoming_fd(buffer, incoming_fd, &flag_pred_out);
+				
 					incoming_fd = -1;
 				}
 				else{
@@ -164,15 +170,55 @@ int main(int argc, char *argv[]){
 			}
 		}
 		//receive udp message
-		/*if(FD_ISSET(fd_server_udp,&read_fds))
+		if(FD_ISSET(fd_server_udp,&read_fds))
 		{
 			n = recvfrom(fd_server_udp,buffer,128,0,(struct sockaddr*)&addr,&addrlen);
-			if(n==-1)exit(1);
+			if(n == -1) exit(1);
 
-			printf("udp_received: %s", buffer);
-			retval = interface_utilizador(buffer, NULL, NULL);
-			//n = sendto(fd_server_udp,"Key is being searched\n",n,0,(struct sockaddr*)&addr,addrlen);
+			udp_addr = addr;
+			udp_addrlen = addrlen;
 
-		}*/
+			message_udp(buffer);
+		
+			FD_ZERO(&read_fds);
+			FD_SET(fd_server_tcp,&read_fds);
+			maxfd = max(maxfd,fd_server_tcp);
+
+			retval = select(maxfd+1,&read_fds,(fd_set*)NULL,(fd_set*)NULL,(struct timeval *)NULL);
+			if(retval <= 0){
+				printf("error: empty select");
+				exit(1);
+			}
+			if(FD_ISSET(fd_server_tcp,&read_fds))
+			{	
+				addrlen = sizeof(addr);
+				incoming_fd = accept(fd_server_tcp,(struct sockaddr*)&addr,&addrlen);
+				if(incoming_fd == -1){
+					printf("error: cannot read message from incoming fd");
+					exit(1);
+				}
+			}
+			if(incoming_fd != -1){
+				FD_SET(incoming_fd,&read_fds);
+				maxfd = max(maxfd,incoming_fd);
+			}
+			if(FD_ISSET(incoming_fd,&read_fds)){
+				if((n = read(incoming_fd,buffer,128)) != 0){
+					if(n==-1){
+						printf("error: cannot read from incoming fd");
+						exit(1);
+					}
+					incoming_fd = -1;
+				}
+			}
+			
+			if (sscanf(buffer, "%s %d %d %s %s", auxiliar.node_IP, &auxiliar.node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5){
+				sprintf(buffer, "%s %d %d %s %s\n", "EKEY", auxiliar.node_key, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP);
+			}
+			
+			n=strlen(buffer);
+			n = sendto(fd_server_udp,buffer,n,0,(struct sockaddr*)&udp_addr,udp_addrlen);
+			if(n==-1) exit(1); 
+		}
 	}
 }
