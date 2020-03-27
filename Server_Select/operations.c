@@ -12,11 +12,8 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				printf("error: before the command <new> use the command <leave> to exit the current ring\n");
 				return -1;
 			}
-			else if(new(comando_utilizador, IP, port) == 0)
+			else if(new(comando_utilizador, IP, port) == 0){
 				return -2;
-			else{
-				printf("error: cannot perform <new>\n");
-				return -1;
 			}
 		}
 
@@ -30,11 +27,6 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 			else if(sentry(comando_utilizador, IP, port) == 0){
 				return -3;
 			}
-			else{
-				printf("error: cannot perform <sentry>\n");
-				return -1;
-			}
-			
 		}
 		else if(strcmp(buffer, "show") == 0){
 			//check if already on the ring
@@ -45,10 +37,6 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				printf("Second sucessor -> key: %d   IP: %s   Port: %s\n", server_state.succ2_key, server_state.succ2_IP, server_state.succ2_TCP);
 				return -4;
 			}
-			else{
-				printf("error: server not on the ring type <new>, <entry> or <sentry>\n");
-				return -1;
-			}
 		}
 		else if(strcmp(buffer, "find") == 0){
 			//check if already on the ring
@@ -56,11 +44,8 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				printf("error: server is not on the ring\n");
 				return -1;
 			}
-			else if(find(comando_utilizador) == 0)
+			else if(find(comando_utilizador) == 0){
 				return -5;
-			else{
-				printf("error: cannot perform <find>\n");
-				return -1;
 			}
 		}
 		else if(strcmp(buffer, "entry") == 0){
@@ -72,10 +57,6 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 			else if(entry(comando_utilizador, IP, port) == 0){
 				return -6;
 			}
-			else{
-				printf("error: cannot perform <entry>\n");
-				return -1;
-			}
 		}
 		else if(strcmp(buffer, "leave") == 0){
 			//check if already on the ring
@@ -85,11 +66,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 			}
 			else if(leave() == 0){
 				return -7;
-			}
-			else{
-				printf("error: cannot perform <leave>\n");
-				return -1;
-			}			
+			}	
 		}
 		else if(strcmp(buffer, "exit") == 0){
 			if(server_state.node_key == -1){
@@ -97,10 +74,6 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 			}
 			else if(leave() == 0){
 				return -8;
-			}
-			else{
-				printf("error: cannot perform <exit>\n");
-				return -1;
 			}
 		}
 		else{
@@ -184,6 +157,7 @@ int find(char* comando_utilizador){
 		}
 		else{
 			printf("error: there's no successor\n");
+			return -1;
 		}
 	}
 	else{
@@ -269,7 +243,7 @@ void send_find_message(int fd, int node_key, char* IP, char* port, char* comand,
 	n = strlen(message);
 
 	n = write(fd, message, n);
-	if(n == -1)exit(1);
+	if(n == -1) exit(1);
 }
 
 void send_message_udp(int fd, int node_key, struct addrinfo *res, char* IP, char* port, char* comand, int search_key){
@@ -283,7 +257,7 @@ void send_message_udp(int fd, int node_key, struct addrinfo *res, char* IP, char
 
 	n = strlen(message);
 
-	n = sendto(fd,message,n,0,res->ai_addr,res->ai_addrlen);
+	n = sendto(fd, message, n, 0, res->ai_addr, res->ai_addrlen);
 	if(n==-1) exit(1);
 }
 

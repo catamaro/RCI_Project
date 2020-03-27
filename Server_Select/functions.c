@@ -4,8 +4,6 @@ int message_incoming_fd(char* message, int incoming_fd, int* flag_pred_out){
 	char buffer[128];
 	int search_key;
 
-	//printf("incoming mensagem: %s", message);
-
 	if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "NEW")==0)){
 		
         if(sscanf(message, "%s %d %s %s", buffer, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 4){
@@ -49,7 +47,6 @@ int message_incoming_fd(char* message, int incoming_fd, int* flag_pred_out){
 
 int message_succ_fd(char* message){
     char buffer[128];
-	//printf("succ mensagem: %s", message);
 
     if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "SUCC") == 0)){
 		succ_SUCC(message);
@@ -70,7 +67,6 @@ int message_succ_fd(char* message){
 
 int message_pred_fd(char* message){
     char buffer[128];
-	//printf("pred mensagem: %s", message);
 
     if (sscanf(message, "%s", buffer) == 1 && strcmp(buffer, "FND") == 0 ){
 		succ_FND(message);
@@ -98,7 +94,6 @@ int message_udp(char* message){
 	}
 
 	return 0;
-
 }
 
 int succ_SUCC(char* message){
@@ -121,6 +116,7 @@ int succ_SUCC(char* message){
 
 int succ_NEW(char* message){
 	char buffer[128];
+
 	//check if NEW has all the parameters
 	if(sscanf(message, "%s %d %s %s", buffer, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 4){
 		//close connection with sucessor if there is more than two servers
@@ -184,8 +180,7 @@ void delay(int m_seconds){
 
 	clock_t start_time = clock();
 
-	while (clock() < start_time + m_seconds)
-		;
+	while (clock() < start_time + m_seconds);
 }
 
 int reconnection_succ(){

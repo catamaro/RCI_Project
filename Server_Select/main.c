@@ -114,7 +114,6 @@ int main(int argc, char *argv[]){
 					}
 
 					retval = message_incoming_fd(buffer, incoming_fd, &flag_pred_out);
-				
 					incoming_fd = -1;
 				}
 				else{
