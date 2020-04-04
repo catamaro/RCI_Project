@@ -173,51 +173,72 @@ int main(int argc, char *argv[]){
 		{
 			n = recvfrom(fd_server_udp,buffer,128,0,(struct sockaddr*)&addr,&addrlen);
 			if(n == -1) exit(1);
+			printf("fd: %d %d\n", fd_server_udp, addrlen);
 
-			udp_addr = addr;
-			udp_addrlen = addrlen;
+			if(server_state.succ_fd == -1){
+				if (sscanf(buffer, "%s %d", auxiliar.node_IP, &auxiliar.node_key) == 2){
+					sprintf(buffer, "%s %d %d %s %s\n", "EKEY", auxiliar.node_key, server_state.node_key, server_state.node_IP, server_state.node_TCP);
+				}
 
-			message_udp(buffer);
-		
-			FD_ZERO(&read_fds);
-			FD_SET(fd_server_tcp,&read_fds);
-			maxfd = max(maxfd,fd_server_tcp);
-
-			retval = select(maxfd+1,&read_fds,(fd_set*)NULL,(fd_set*)NULL,(struct timeval *)NULL);
-			if(retval <= 0){
-				printf("error: empty select");
-				exit(1);
+				n = strlen(buffer);
+				printf("buffer: %s\n", buffer);
+				printf("fd: %d %d\n", fd_server_udp, addrlen);
+				n = sendto(fd_server_udp, buffer, n, 0, (struct sockaddr*)&addr, addrlen);
+				if(n==-1){
+					printf("morri aqui 2 :(");
+					exit(1); 
+				} 
 			}
-			if(FD_ISSET(fd_server_tcp,&read_fds))
-			{	
-				addrlen = sizeof(addr);
-				incoming_fd = accept(fd_server_tcp,(struct sockaddr*)&addr,&addrlen);
-				if(incoming_fd == -1){
-					printf("error: cannot read message from incoming fd");
+
+			if(server_state.succ_fd != -1){
+
+				udp_addr = addr;
+				udp_addrlen = addrlen;
+				message_udp(buffer);
+
+				FD_ZERO(&read_fds);
+				FD_SET(fd_server_tcp,&read_fds);
+				maxfd = max(maxfd,fd_server_tcp);
+
+				retval = select(maxfd+1,&read_fds,(fd_set*)NULL,(fd_set*)NULL,(struct timeval *)NULL);
+				if(retval <= 0){
+					printf("error: empty select");
 					exit(1);
 				}
-			}
-			if(incoming_fd != -1){
-				FD_SET(incoming_fd,&read_fds);
-				maxfd = max(maxfd,incoming_fd);
-			}
-			if(FD_ISSET(incoming_fd,&read_fds)){
-				if((n = read(incoming_fd,buffer,128)) != 0){
-					if(n==-1){
-						printf("error: cannot read from incoming fd");
+				if(FD_ISSET(fd_server_tcp,&read_fds))
+				{	
+					addrlen = sizeof(addr);
+					incoming_fd = accept(fd_server_tcp,(struct sockaddr*)&addr,&addrlen);
+					if(incoming_fd == -1){
+						printf("error: cannot read message from incoming fd");
 						exit(1);
 					}
-					incoming_fd = -1;
 				}
+				if(incoming_fd != -1){
+					FD_SET(incoming_fd,&read_fds);
+					maxfd = max(maxfd,incoming_fd);
+				}
+				if(FD_ISSET(incoming_fd,&read_fds)){
+					if((n = read(incoming_fd,buffer,128)) != 0){
+						if(n == -1){
+							printf("error: cannot read from incoming fd");
+							exit(1);
+						}
+						incoming_fd = -1;
+					}
+				}
+				if (sscanf(buffer, "%s %d %d %s %s", auxiliar.node_IP, &auxiliar.node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5){
+					sprintf(buffer, "%s %d %d %s %s\n", "EKEY", auxiliar.node_key, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP);
+				}
+
+				n = strlen(buffer);
+				printf("buffer: %s", buffer);
+				n = sendto(fd_server_udp, buffer, n, 0, (struct sockaddr*)&udp_addr, udp_addrlen);
+				if(n==-1){
+					printf("morri aqui :(");
+					exit(1); 
+				} 
 			}
-			
-			if (sscanf(buffer, "%s %d %d %s %s", auxiliar.node_IP, &auxiliar.node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5){
-				sprintf(buffer, "%s %d %d %s %s\n", "EKEY", auxiliar.node_key, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP);
-			}
-			
-			n=strlen(buffer);
-			n = sendto(fd_server_udp,buffer,n,0,(struct sockaddr*)&udp_addr,udp_addrlen);
-			if(n==-1) exit(1); 
 		}
 	}
 }

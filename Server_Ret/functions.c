@@ -196,45 +196,6 @@ int succ_FND(char* message){
 	return 0;
 }
 
-/*int udp_EFND(char* message){
-	char buffer[128];
-	int search_key, dis_act, dis_succ;
-	struct addrinfo *res;
-	
-	if(sscanf(message, "%s %d", buffer, &search_key) == 2){
-		dis_act = server_state.node_key-search_key;
-		dis_succ = server_state.succ_key-search_key;
-		if(dis_succ < 0) dis_succ += N;
-		if(dis_act < 0) dis_act += N;
-		
-		if(dis_succ > dis_act){
-			send_find_message(server_state.succ_fd, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "EFND", search_key);
-		}
-		else{
-			auxiliar.succ_fd = TCP_CLIENT(auxiliar.node_IP, auxiliar.node_TCP);
-			if(auxiliar.succ_fd != -1){
-				send_find_message(auxiliar.succ_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "EKEY", search_key);
-			}
-		}
-
-		if(dis_succ > dis_act){
-			send_message_udp(server_state.succ_fd, auxiliar.node_key, "EFND", res);
-		}
-		else{
-			//auxiliar.succ_fd = UDP_CLIENT(auxiliar.node_IP, auxiliar.node_TCP, &());
-			if(auxiliar.succ_fd != -1){
-				send_message_udp(auxiliar.succ_fd, server_state.succ_key, "EKEY", res);
-			}
-		}
-	}
-	else{
-		printf("error: sscanf did not received the correct FND message\n");
-		return -1;
-	}	
-
-	return 0;
-}*/
-
 void delay(int m_seconds){
 
 	clock_t start_time = clock();

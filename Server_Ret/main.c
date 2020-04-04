@@ -13,7 +13,8 @@ int main(int argc, char *argv[]){
 	int maxfd,retval;
 	int flag_pred_out = 0;
 	char IP[128], port[128];
-
+	struct addrinfo *res;
+	int fd;
 	
 	//exit when wrong #arguments
 	if(argc != 3){
@@ -176,6 +177,7 @@ int main(int argc, char *argv[]){
 		//receive udp message
 		if(FD_ISSET(fd_server_udp,&read_fds))
 		{
+			addrlen = sizeof(addr);
 			n = recvfrom(fd_server_udp,buffer,128,0,(struct sockaddr*)&addr,&addrlen);
 			if(n == -1) exit(1);
 
@@ -184,7 +186,25 @@ int main(int argc, char *argv[]){
 
 			printf("udp_received: %s\n", buffer);
 
-			message_udp(buffer);
+			if(server_state.succ_fd == -1){
+				if (sscanf(buffer, "%s %d", auxiliar.node_IP, &auxiliar.node_key) == 2){
+					sprintf(buffer, "%s %d %d %s %s\n", "EKEY", auxiliar.node_key, server_state.node_key, server_state.node_IP, server_state.node_TCP);
+				}
+
+				n = strlen(buffer);
+				printf("buffer: %s\n", buffer);
+				printf("fd: %d %d\n", fd_server_udp, addrlen);
+				res = UDP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP, &fd);
+				n = sendto(fd, buffer, 128, 0, res->ai_addr,res->ai_addrlen);
+				close(fd);
+				if(n==-1){
+					printf("morri aqui 2 :(");
+					exit(1); 
+				} 
+			}
+			else{
+				message_udp(buffer);
+			}
 		}
 	}
 }

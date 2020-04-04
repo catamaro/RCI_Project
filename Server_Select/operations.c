@@ -183,6 +183,8 @@ int entry(char* comando_utilizador, char* IP, char* port){
 		send_message_udp(fd, node_key, res, NULL, NULL, "EFND", 0);
 
 		recvfrom(fd, message, 128, 0, (struct sockaddr*)res, &(res->ai_addrlen));
+
+		printf("message: %s\n", message);
 	}
 	else{
 		printf("error: command of type sentry <i> <j> <IP_j> <port_j> \n");

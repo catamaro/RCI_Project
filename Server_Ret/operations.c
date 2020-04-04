@@ -208,23 +208,24 @@ int entry(char* comando_utilizador, char* IP, char* port){
 
 		res = UDP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP, &fd);
 		send_message_udp(fd, node_key, res, NULL, NULL, "EFND", 0);
+		close(fd);
 
-		recvfrom(fd, message, 128, 0, (struct sockaddr*)res, &(res->ai_addrlen));
-		printf("mensagem recebida: %s\n", message);
+		/*recvfrom(fd, message, 128, 0, res->ai_addr, &(res->ai_addrlen));
+		*/
 	}
 	else{
 		printf("error: command of type sentry <i> <j> <IP_j> <port_j> \n");
 		return -1;
 	}
 
-	if (sscanf(message, "%s %d %d %s %s", buffer, &node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5){
+	/*if (sscanf(message, "%s %d %d %s %s", buffer, &node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5){
 		sprintf(message, "%s %d %d %s %s\n", "sentry", node_key, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP);
 		sentry(message, IP, port);
 	}
 	else{
 		printf("error: command of type EKEY <i> <j> <IP_j> <port_j> \n");
 		return -1;
-	}
+	}*/
 
 	return 0;
 }
