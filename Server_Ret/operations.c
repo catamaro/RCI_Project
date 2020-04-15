@@ -1,6 +1,6 @@
 #include "main.h"
 
-int interface_utilizador(char* comando_utilizador, char* IP, char* port){
+int interface_utilizador(char* comando_utilizador, char* IP, char* port, int fd_server_udp){
 	char buffer[128];
 
     if(sscanf(comando_utilizador, "%s", buffer) == 1){
@@ -69,7 +69,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 				printf("error: server already on the ring\n");
 				return -1;
 			}
-			else if(entry(comando_utilizador, IP, port) == 0){
+			else if(entry(comando_utilizador, IP, port, fd_server_udp) == 0){
 				return -6;
 			}
 			else{
@@ -108,7 +108,9 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port){
 			return -1;
 		}
 	}
-
+	else{
+		printf("error: could read the comand\n");
+	}
 	return -1;
 }
 
@@ -147,7 +149,7 @@ int sentry(char* comando_utilizador, char* IP, char* port){
 
 	if (sscanf(comando_utilizador, "%s %d %d %s %s", buffer, &node_key, &server_state.succ_key, server_state.succ_IP, server_state.succ_TCP) == 5){
 		if(node_key > 32){
-			printf("i cannot overcome %d\n", N);
+			printf("error: i cannot overcome %d\n", N);
 			return -1;
 		}
 		//state of new server is updated
@@ -183,7 +185,7 @@ int find(char* comando_utilizador){
 			send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);	
 		}
 		else{
-			printf("error: there's no successor\n");
+			printf("Key %d is stored on server -> key: %d   IP: %s   Port: %s\n", search_key, server_state.node_key, server_state.node_IP, server_state.node_TCP);
 		}
 
 	}
@@ -194,38 +196,24 @@ int find(char* comando_utilizador){
 	return 0;
 }
 
-int entry(char* comando_utilizador, char* IP, char* port){
-	int node_key, fd = 0;
+int entry(char* comando_utilizador, char* IP, char* port, int fd_server_udp){
+	int node_key;
 	struct addrinfo *res;
 	char buffer[128];
-	char message[128];
 
 	if (sscanf(comando_utilizador, "%s %d %d %s %s", buffer, &node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5){
 		if(node_key > 32){
-			printf("i cannot overcome %d\n", N);
+			printf("error: i cannot overcome %d\n", N);
 			return -1;
 		}
 
-		res = UDP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP, &fd);
-		send_message_udp(fd, node_key, res, NULL, NULL, "EFND", 0);
-		close(fd);
-
-		/*recvfrom(fd, message, 128, 0, res->ai_addr, &(res->ai_addrlen));
-		*/
+		res = UDP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP, fd_server_udp);
+		send_message_udp(fd_server_udp, node_key, NULL, NULL, "EFND", 0, (struct sockaddr *)res->ai_addr, res->ai_addrlen);
 	}
 	else{
 		printf("error: command of type sentry <i> <j> <IP_j> <port_j> \n");
 		return -1;
 	}
-
-	/*if (sscanf(message, "%s %d %d %s %s", buffer, &node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5){
-		sprintf(message, "%s %d %d %s %s\n", "sentry", node_key, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP);
-		sentry(message, IP, port);
-	}
-	else{
-		printf("error: command of type EKEY <i> <j> <IP_j> <port_j> \n");
-		return -1;
-	}*/
 
 	return 0;
 }
@@ -249,7 +237,7 @@ int leave(){
 
 void send_message(int fd, int node_key, char* IP, char* port, char* comand){
 
-	size_t n;
+	size_t n, m;
 	char message[128];
 
 	if(strcmp(comand, "SUCCCONFIG") == 0) 
@@ -259,8 +247,11 @@ void send_message(int fd, int node_key, char* IP, char* port, char* comand){
 	
 	n = strlen(message);
 	
-	n = write(fd,message,n);
-	if(n == -1) exit(1);
+	m = write(fd,message,n);
+	if(m == -1){
+		printf("error: could not perform write");
+		exit(1); 
+	}
 }
 
 void send_find_message(int fd, int node_key, char* IP, char* port, char* comand, int search_key){
@@ -272,23 +263,30 @@ void send_find_message(int fd, int node_key, char* IP, char* port, char* comand,
 	n = strlen(message);
 
 	n = write(fd, message, n);
-	if(n == -1)exit(1);
+	if(n == -1){
+		printf("error: could not perform write");
+		exit(1); 
+	} 
 }
 
-void send_message_udp(int fd, int node_key, struct addrinfo *res, char* IP, char* port, char* comand, int search_key){
+void send_message_udp(int fd, int node_key, char* IP, char* port, char* comand, int search_key, struct sockaddr *addr, socklen_t addrlen){
 	size_t n;
 	char message[128];
 
-	if(strcmp(comand, "EFND") == 0) 
+	if(strcmp(comand, "EFND") == 0){
 		sprintf(message, "%s %d\n", comand, node_key);
-	else
+	}
+	else{
 		sprintf(message, "%s %d %d %s %s\n", comand, search_key, node_key, IP, port);
-
-	printf("message: %s\n", message);
+	}
+		
 	n = strlen(message);
 
-	n = sendto(fd,message,n,0,res->ai_addr,res->ai_addrlen);
-	if(n==-1) exit(1);
+	n = sendto(fd, message, n, 0, addr, addrlen);
+	if(n == -1){
+		printf("error: could not perform sendto");
+		exit(1); 
+	} 
 }
 
 

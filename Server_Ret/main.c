@@ -7,14 +7,15 @@ int main(int argc, char *argv[]){
 	struct sockaddr_in addr;
 	struct sockaddr_in udp_addr;
 	socklen_t addrlen;
-	socklen_t udp_addrlen = 0;
 	char buffer[128];
 	fd_set read_fds;
 	int maxfd,retval;
-	int flag_pred_out = 0;
+	int flag_pred_out = 0, flag_udp = 0;
 	char IP[128], port[128];
-	struct addrinfo *res;
-	int fd;
+	struct timeval *time_udp = NULL;
+	char last_message[128];
+
+	int time_flag = 0;
 	
 	//exit when wrong #arguments
 	if(argc != 3){
@@ -74,136 +75,143 @@ int main(int argc, char *argv[]){
         	maxfd = max(maxfd,pred_fd);
 		}
 
-		//blocks until one fd is ready to read **or until timer ends**
-		retval = select(maxfd+1,&read_fds,(fd_set*)NULL,(fd_set*)NULL,(struct timeval *)NULL);
-		if(retval <= 0){
-			printf("error: empty select");
+		//blocks until one fd is ready to read or until timer ends
+		retval = select(maxfd+1,&read_fds,(fd_set*)NULL,(fd_set*)NULL, time_udp); //para por o timer a funcionar basta subsitituir o último NULL por &tv
+		if(retval == -1){
+			printf("error: error in select function\n");
 			exit(1);
 		}
-		
-        //read from keyboard
-		if(FD_ISSET(STDIN_FILENO,&read_fds)){
-			if(fgets(buffer, 128, stdin) == NULL){
-				printf("error: reading from keyboard\n");
-				exit(1);
+		else if(retval){
+        	//read from keyboard
+			if(FD_ISSET(STDIN_FILENO,&read_fds)){
+				if(fgets(buffer, 128, stdin) == NULL){
+					printf("error: reading from keyboard\n");
+					exit(1);
+				}
+				strcpy(last_message, buffer);
+				//se retornar -2 o new funcionou mas como és o único serve no anel não existe succ e não vai dar set
+				retval = interface_utilizador(buffer, IP, port, fd_server_udp);
+				if(retval == -2) printf("Ring created successfully\n");
+				else if(retval == -3) printf("Server entered successfully on the ring\n");
+				else if(retval == -4) printf("Show completed\n");
+				else if(retval == -6){
+					time_udp = malloc(sizeof(struct timeval));
+					(*time_udp).tv_sec = 5;
+					(*time_udp).tv_usec = 0;
+					time_flag = 0;
+				} 
+				else if(retval == -7) printf("Server leaved ring successfully\n");
+				else if(retval == -8){
+					close(fd_server_udp);
+					close(fd_server_tcp);
+					close(incoming_fd);
+					return 0;
+				}
+
 			}
-			
-			//se retornar -2 o new funcionou mas como és o único serve no anel não existe succ e não vai dar set
-			retval = interface_utilizador(buffer, IP, port);
-			if(retval == -2) printf("Ring created successfully\n");
-			else if(retval == -3) printf("Server entered successfully on the ring\n");
-			else if(retval == -4) printf("Show completed\n");
-			else if(retval == -6) printf("Server entered successfully on the ring\n");
-			else if(retval == -7) printf("Server leaved ring successfully\n");
-			else if(retval == -8){
-				close(fd_server_udp);
-				close(fd_server_tcp);
-				close(incoming_fd);
-				return 0;
+			//receive message from new server
+			if(incoming_fd != -1){
+				if(FD_ISSET(incoming_fd,&read_fds))
+				{
+					if((n = read(incoming_fd,buffer,128)) != 0)
+					{
+						if(n==-1){
+							printf("error: cannot read from incoming fd");
+							exit(1);
+						}
+
+						message_incoming_fd(buffer, incoming_fd, &flag_pred_out, udp_addr, fd_server_udp, &flag_udp);
+						incoming_fd = -1;
+					}
+					else{
+						close(incoming_fd);//connection closed by peer
+						incoming_fd = -1;
+					}
+				}
 			}
+			//receive message from sucessor
+			if(succ_fd != -1){
+				if(FD_ISSET(succ_fd,&read_fds)){
+					if((n = read(succ_fd,buffer,128)) != 0){
+						if(n==-1){
+							printf("error: cannot read message from sucessor");
+							exit(1);
+						}
+						message_succ_fd(buffer);
+					}
+					else{
+						close(succ_fd);//connection closed by peer
+						server_state.succ_fd = -1;
+						reconnection_succ();
+					}
+				}
+			}
+			//receive tcp message from predecessor
+			if(pred_fd != -1){
+				if(FD_ISSET(pred_fd,&read_fds))
+				{
+					if((n = read(pred_fd,buffer,128))!=0)
+					{
+						if(n==-1){
+							printf("error: cannot read message from predecessor");
+							exit(1);
+						}
+						message_pred_fd(buffer);
+					}
+					else{
+						close(pred_fd);//connection closed by peer
+						server_state.pred_fd = -1;
+						flag_pred_out = 1;
+					}
+				}
+			}
+			//create tcp connection
+			if(FD_ISSET(fd_server_tcp,&read_fds))
+			{	
+				addrlen = sizeof(addr);
+				incoming_fd = accept(fd_server_tcp,(struct sockaddr*)&addr,&addrlen);
+				if(incoming_fd == -1){
+					printf("error: cannot read message from incoming fd");
+					exit(1);
+				}
+			}
+			//receive udp message
+			if(FD_ISSET(fd_server_udp,&read_fds))
+			{	
+				char message[128];
+
+				addrlen = sizeof(addr);
+				n = recvfrom(fd_server_udp, message, 128, 0, (struct sockaddr*)&addr, &addrlen);
 				
-		}
-		//receive message from new server
-		if(incoming_fd != -1){
-			if(FD_ISSET(incoming_fd,&read_fds))
-			{
-				if((n = read(incoming_fd,buffer,128)) != 0)
-				{
-					if(n==-1){
-						printf("error: cannot read from incoming fd");
-						exit(1);
-					}
-
-					retval = message_incoming_fd(buffer, incoming_fd, &flag_pred_out);
-					if(retval == -2){
-						n=strlen(buffer);
-						n = sendto(fd_server_udp,buffer,n,0,(struct sockaddr*)&udp_addr,udp_addrlen);
-						if(n==-1) exit(1);
-					}
-					incoming_fd = -1;
-				}
-				else{
-					close(incoming_fd);//connection closed by peer
-					incoming_fd = -1;
-				}
-			}
-		}
-		//receive message from sucessor
-		if(succ_fd != -1){
-			if(FD_ISSET(succ_fd,&read_fds)){
-				if((n = read(succ_fd,buffer,128)) != 0){
-					if(n==-1){
-						printf("error: cannot read message from sucessor");
-						exit(1);
-					}
-					message_succ_fd(buffer);
-				}
-				else{
-					close(succ_fd);//connection closed by peer
-					server_state.succ_fd = -1;
-					reconnection_succ();
-				}
-			}
-		}
-		//receive tcp message from predecessor
-		if(pred_fd != -1){
-			if(FD_ISSET(pred_fd,&read_fds))
-			{
-				if((n=read(pred_fd,buffer,128))!=0)
-				{
-					if(n==-1){
-						printf("error: cannot read message from predecessor");
-						exit(1);
-					}
-					message_pred_fd(buffer);
-				}
-				else{
-					close(pred_fd);//connection closed by peer
-					server_state.pred_fd = -1;
-					flag_pred_out = 1;
-				}
-			}
-		}
-		//create tcp connection
-		if(FD_ISSET(fd_server_tcp,&read_fds))
-		{	
-			addrlen = sizeof(addr);
-			incoming_fd = accept(fd_server_tcp,(struct sockaddr*)&addr,&addrlen);
-			if(incoming_fd == -1){
-				printf("error: cannot read message from incoming fd");
-				exit(1);
-			}
-		}
-		//receive udp message
-		if(FD_ISSET(fd_server_udp,&read_fds))
-		{
-			addrlen = sizeof(addr);
-			n = recvfrom(fd_server_udp,buffer,128,0,(struct sockaddr*)&addr,&addrlen);
-			if(n == -1) exit(1);
-
-			udp_addr = addr;
-			udp_addrlen = addrlen;
-
-			printf("udp_received: %s\n", buffer);
-
-			if(server_state.succ_fd == -1){
-				if (sscanf(buffer, "%s %d", auxiliar.node_IP, &auxiliar.node_key) == 2){
-					sprintf(buffer, "%s %d %d %s %s\n", "EKEY", auxiliar.node_key, server_state.node_key, server_state.node_IP, server_state.node_TCP);
-				}
-
-				n = strlen(buffer);
-				printf("buffer: %s\n", buffer);
-				printf("fd: %d %d\n", fd_server_udp, addrlen);
-				res = UDP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP, &fd);
-				n = sendto(fd, buffer, 128, 0, res->ai_addr,res->ai_addrlen);
-				close(fd);
-				if(n==-1){
-					printf("morri aqui 2 :(");
+				printf("message udp: %s\n", message);
+				if(n == -1){
+					printf("error: cannot recvfrom");
 					exit(1); 
 				} 
+				else{
+					free(time_udp);
+					time_udp = NULL;
+					time_flag = 0;
+				}
+
+				udp_addr = addr;
+				n = message_udp(message, udp_addr, IP, port, &flag_udp);
+				flag_udp = 1;
+			}
+		}
+		else{
+			if(time_flag == 0){
+        		printf("error: No data within 5 seconds message will be resend.\n");
+
+				retval = interface_utilizador(last_message, IP, port, fd_server_udp);
+				
+				//waits more 5 seconds
+				(*time_udp).tv_sec = 10;
+				time_flag = 1;
 			}
 			else{
-				message_udp(buffer);
+				printf("error: No answer received within 10 seconds.\n");
+				exit(1);
 			}
 		}
 	}
