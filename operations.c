@@ -12,7 +12,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port, int *fd
 				printf("error: before the command <new> use the command <leave> to exit the current ring\n");
 				return -1;
 			}
-			//inicialize TCP comunication for 1st server
+			//inicialize TCP comunication when entering the ring			
 			*fd_server_tcp = TCP_SERVER(port);
 			if(*fd_server_tcp == -1) return -1;
 
@@ -29,7 +29,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port, int *fd
 				printf("error: server already on the ring\n");
 				return -1;
 			}
-			//inicialize TCP comunication for 1st server
+			//inicialize TCP comunication when entering the ring
 			if(*fd_server_tcp == -1) *fd_server_tcp = TCP_SERVER(port);
 			if(*fd_server_tcp == -1) return -1;
 
@@ -38,6 +38,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port, int *fd
 			else
 				return -1;
 		}
+		//show information stored on the ring
 		else if(strcmp(buffer, "show") == 0){
 			//check if already on the ring
 			if(server_state.node_key != -1){
@@ -52,6 +53,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port, int *fd
 				return -1;
 			}
 		}
+		//send find message for sucessor
 		else if(strcmp(buffer, "find") == 0){
 			//check if already on the ring
 			if(server_state.node_key == -1){
@@ -63,12 +65,14 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port, int *fd
 			else
 				return -1;
 		}
+		//entry on the ring with search of sucessor
 		else if(strcmp(buffer, "entry") == 0){
 			//check if already on the ring
 			if(server_state.node_key != -1){
 				printf("error: server already on the ring\n");
 				return -1;
 			}
+			//inicialize TCP comunication when entering the ring	
 			if(*fd_server_tcp == -1) *fd_server_tcp = TCP_SERVER(port);
 			if(*fd_server_tcp == -1) return -1;
 			
@@ -77,6 +81,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port, int *fd
 			else
 				return -1;
 		}
+		//resets ring information and closes fd
 		else if(strcmp(buffer, "leave") == 0){
 			//check if already on the ring
 			if(server_state.node_key == -1){
@@ -87,6 +92,7 @@ int interface_utilizador(char* comando_utilizador, char* IP, char* port, int *fd
 
 			return -7;
 		}
+		//resets ring information and closes fd
 		else if(strcmp(buffer, "exit") == 0){
 			if(server_state.node_key == -1)
 				return -8;
@@ -118,6 +124,7 @@ int new(char* comando_utilizador, char* IP, char* port){
 			return -1;
 		}
 				
+		//add information to create the ring
 		server_state.node_key = node_key; 
 		strcpy(server_state.node_IP, IP); 
 		strcpy(server_state.node_TCP, port); 
@@ -167,7 +174,7 @@ int sentry(char* comando_utilizador, char* IP, char* port){
 }
 
 int find(char* comando_utilizador){
-
+	size_t n;
 	int search_key;
 	char buffer[10];
 
@@ -176,9 +183,16 @@ int find(char* comando_utilizador){
 			printf("error: i cannot overcome %d\n", N);
 			return -1;
 		}
-		
+		//if not alone on the ring send find message to sucessor
 		if(server_state.succ_fd != -1){
-			send_message_tcp(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);	
+			n = send_message_tcp(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);	
+			//when write fails the message is kept, the name of the veriable where the message is to be sent
+			//and the flag is activated
+			if(n == -1){
+				strcpy(lost_message.encode_fd, "server_state.succ_fd");
+				lost_message.resent = 1;
+				return -1;
+			} 
 		}
 		else{
 			printf("Key %d is stored on server -> key: %d   IP: %s   Port: %s\n", search_key, server_state.node_key, server_state.node_IP, server_state.node_TCP);
@@ -207,7 +221,9 @@ int entry(char* comando_utilizador, char* IP, char* port, int *fd_server_udp){
 		}
 
 
+		//gets the address of the server where EFND is going to be sent
 		res = UDP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP, *fd_server_udp);
+		//sends udp message 
 		send_message_udp(*fd_server_udp, node_key, NULL, NULL, "EFND", 0, (struct sockaddr *)res->ai_addr, res->ai_addrlen);
 		
 		freeaddrinfo(res);
@@ -222,8 +238,9 @@ int entry(char* comando_utilizador, char* IP, char* port, int *fd_server_udp){
 
 void leave(){
 
+	//reset of all the server state information
 	if(server_state.succ_fd != -1) close(server_state.succ_fd);
-	if(server_state.pred_fd != -1) close(server_state.pred_fd);
+	if(server_state.pred_fd != -1) close(server_state.pred_fd); //shutdown(server_state.pred_fd, SHUT_RDWR);
 	server_state.succ_fd = -1;
 	server_state.pred_fd = -1;
 	server_state.node_key = -1; 
@@ -235,40 +252,43 @@ void leave(){
 	strcpy(server_state.succ2_TCP, "0000");
 }
 
-void send_message_tcp(int fd, int node_key, char* IP, char* port, char* comand, int search_key){
+int send_message_tcp(int fd, int node_key, char* IP, char* port, char* comand, int search_key){
 
 	size_t n;
 	char message[128];
 
+	//construct all the possible tcp messages
 	if(strcmp(comand, "SUCCCONF") == 0) 
 		strcpy(message, "SUCCCONF\n");
-	else if(strcmp(comand, "FND") == 0 || strcmp(comand, "KEY"))
+	else if(strcmp(comand, "KEY") == 0 || strcmp(comand, "FND") == 0)
 		sprintf(message, "%s %d %d %s %s\n", comand, search_key, node_key, IP, port);
-	else
+	else if(strcmp(comand, "NEW") == 0 || strcmp(comand, "SUCC") == 0)
 		sprintf(message, "%s %d %s %s\n", comand, node_key, IP, port);
+	else return -1;
 
-	printf("message tcp: %s\n", message);
-	
+	//send tcp message 
 	n = tcp_write(fd, message);
-	if (n == -1) lost_message.resent = 1;
+	if(n == -1) return -1;
+
+	return 0;
 }
 
 void send_message_udp(int fd, int node_key, char* IP, char* port, char* comand, int search_key, struct sockaddr *addr, socklen_t addrlen){
 	size_t n;
 	char message[128];
 	
-
-	if(strcmp(comand, "EFND") == 0){
+	//construct all the possible udp messages
+	if(strcmp(comand, "EFND") == 0)
 		sprintf(message, "%s %d\n", comand, node_key);
-	}
-	else{
+	else if(strcmp(comand, "EKEY") == 0)
 		sprintf(message, "%s %d %d %s %s\n", comand, search_key, node_key, IP, port);
-	}
+	else return;
 		
 	n = strlen(message);
 
-	printf("message ups: %s threw fd: %d\n", message, fd);
-
+	//if message is not sent timer of server who sent the
+	//message will expire and send it again, if incorrect
+	//once again sender aplication will end
 	n = sendto(fd, message, n, 0, addr, addrlen);
 	if(n == -1){
 		printf("error: could not perform sendto\n");
@@ -280,6 +300,7 @@ int tcp_read(int fd, char* message){
 	char *buffer = (char*) calloc(sizeof(char),128);
 	char *aux = (char*) calloc(sizeof(char),128);
 
+	//read message package by package
 	do{
 		//reset the buffer for further reading
 		memset(buffer, 0, strlen(buffer));
@@ -292,15 +313,17 @@ int tcp_read(int fd, char* message){
 		}
 		else return n;
 		
-		//no primeiro ciclo copia para o aux para o inicializar e a partir daí concatena o resto da mensagem
+		//copy buffer to aux in the first iteration
 		if (i == 0)
 			strncpy(aux, buffer, n);
 		else
+		//construct the message byte by byte
 			strncat(aux, buffer, n);		
 		i++;
 
-	}while(buffer[n-1] != 10);
+	}while(buffer[n-1] != 10);//stops when \n is encountered, \n = 10 in ascii
 
+	//final message is stored
 	strcpy(message, aux);
 
 	free(aux);
@@ -308,7 +331,6 @@ int tcp_read(int fd, char* message){
 
 	return n;
 }
-
 
 int tcp_write(int fd, char* message){
 	size_t n, nleft, nwritten;
@@ -319,9 +341,11 @@ int tcp_write(int fd, char* message){
 	n = strlen(message);
 	nleft = n;
 
+	//write message package by package for further reading
 	while(nleft > 0){
 		nwritten = write(fd,message,nleft); 
-		if(nwritten <= 0){
+		if((int)nwritten <= 0){
+			strcpy(lost_message.message, message);
 			printf("error: could not perform write\n");
 			return -1; 
 		}

@@ -63,16 +63,20 @@ int TCP_SERVER (char* port){
 
 	if(sigaction(SIGPIPE,&act,NULL) == -1) exit(0);
 
-    n = getaddrinfo (NULL,port,&hints,&res); // localhost vai ser tejo ou enedereço do pai
+    n = getaddrinfo (NULL,port,&hints,&res); 
     if(n != 0){
         perror("error: on tcp getaddrinfo");
         exit(1);
     }
 
 	n = bind (fd,res->ai_addr,res->ai_addrlen);
+    //when bind fails program returns -1 because the tcp connection
+    //is established when there is a entry, sentry or new so if it 
+    //fails it can be added again further on the program
     if(n == -1){
         perror("error: on tcp bind");
         printf("please try and wait until tcp address is complety reset\n");
+	    freeaddrinfo(res);
         return -1;
     }
 
@@ -89,8 +93,6 @@ int TCP_SERVER (char* port){
 struct addrinfo* UDP_CLIENT(char* IP, char* port, int fd){
     int errcode;
     struct addrinfo hints, *res;
-
-    //fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;      //IPv4
@@ -131,6 +133,9 @@ int UDP_SERVER (char* port){
     }
 
 	n = bind (fd,res->ai_addr,res->ai_addrlen);
+    //when bind fails program exits because the udp connection
+    //could never more be established once it is on the beggining 
+    //of the code 
     if(n == -1){
         perror("error: on udp bind");
         printf("please try and wait until udp address is complety reset\n");

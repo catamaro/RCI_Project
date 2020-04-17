@@ -19,12 +19,15 @@
 
 #define N 32
 
-typedef struct lost_message
+//struct to store lost messages in TCP for later resend
+typedef struct message
 {
     char message[128];
     int resent;
+    int ready;
+    char encode_fd[128];
     int fd;
-} message;
+}
 
 message lost_message;
 
@@ -61,7 +64,7 @@ int sentry(char* comando_utilizador, char* IP, char* port);
 int find(char* comando_utilizador);
 void leave();
 int entry(char* comando_utilizador, char* IP, char* port, int *fd_server_udp);
-void send_message_tcp(int fd, int node_key, char* IP, char* port, char* comand, int search_key);
+int send_message_tcp(int fd, int node_key, char* IP, char* port, char* comand, int search_key);
 void send_message_udp(int fd, int node_key, char* IP, char* port, char* comand, int search_key, struct sockaddr *addr, socklen_t addrlen);
 int tcp_read(int fd, char* buffer);
 int tcp_write(int fd, char* message);
@@ -76,5 +79,6 @@ int succ_SUCC(char* message);
 int succ_FND(char* message);
 
 int reconnection_succ();
+void decode_fd();
 
 #endif
