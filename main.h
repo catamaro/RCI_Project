@@ -20,6 +20,16 @@
 
 #define N 32
 
+//struct to store lost messages in TCP for later resend
+typedef struct message
+{
+    char message[128];
+    int resent;
+    int fd;
+} message;
+
+message lost_message;
+
 //struct with information of server state
 typedef struct relations
 {
