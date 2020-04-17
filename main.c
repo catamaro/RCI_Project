@@ -37,6 +37,7 @@ int main(int argc, char *argv[]){
 		strcpy(IP, argv[1]);
 		strcpy(port, argv[2]);
 	}
+	printf("The maximum number of keys is set at %d\n\n", N);
 
 	//inicialize TCP and UDP comunication for 1st server
     fd_server_udp = UDP_SERVER(port);
@@ -45,7 +46,11 @@ int main(int argc, char *argv[]){
 	server_state.node_key = -1;
 	server_state.succ_fd = -1;
 	server_state.pred_fd = -1;
+	lost_message.fd = -1;
+	lost_message.resent = 0;
+	lost_message.ready = 0;
 
+	//when running = false program exits orderly 
 	while(running){
 		//reset set of read file descriptors
         FD_ZERO(&read_fds);
@@ -53,8 +58,7 @@ int main(int argc, char *argv[]){
         FD_SET(STDIN_FILENO,&read_fds);
         maxfd = STDIN_FILENO;
 
-		//add TCP fd to set 
-		//este fd basicamente está à espera de novas coneções por TCP
+		//add TCP fd to set, waits for new TCP connections
 		if(fd_server_tcp != -1){
 			FD_SET(fd_server_tcp,&read_fds);
 	    	maxfd = max(maxfd,fd_server_tcp);
@@ -64,7 +68,7 @@ int main(int argc, char *argv[]){
 		FD_SET(fd_server_udp,&read_fds);
         maxfd = max(maxfd,fd_server_udp);
 
-		//uma nova ligação aceite vai dar origem a um novo fd para a comunicação
+		//an accepted connection creates a new fd for communication
 		if(incoming_fd != -1){
 			FD_SET(incoming_fd,&read_fds);
         	maxfd = max(maxfd,incoming_fd);
@@ -84,13 +88,14 @@ int main(int argc, char *argv[]){
         	maxfd = max(maxfd,pred_fd);
 		}
 
-		//blocks until one fd is ready to read or until timer ends
+		//blocks until one fd is ready to read or until udp timer is activated and it ends
 		retval = select(maxfd+1,&read_fds,(fd_set*)NULL,(fd_set*)NULL, time_udp); //para por o timer a funcionar basta subsitituir o último NULL por &tv
 		if(retval == -1){
 			printf("error: error in select function\n");
 			running = false;
 		}
 		else if(retval){
+
         	//read from keyboard
 			if(FD_ISSET(STDIN_FILENO,&read_fds)){
 				if(fgets(buffer, 128, stdin) == NULL){
@@ -99,23 +104,29 @@ int main(int argc, char *argv[]){
 				}
 				strcpy(last_message, buffer);
 
-				//se retornar -2 o new funcionou mas como és o único serve no anel não existe succ e não vai dar set
+				//handler of possible returns regarding the input of the keyboard message
 				n = interface_utilizador(buffer, IP, port, &fd_server_udp, &fd_server_tcp);
+				//new is performed correctly
 				if(n == -2) printf("Ring created successfully\n");
+				//sentry is performed correctly
 				else if(n == -3) printf("Server entered successfully on the ring\n");
+				//show is performed correcly
 				else if(n == -4) printf("Show completed\n");
+				//entry is performed correcly
 				else if(n == -6){
 					time_udp = malloc(sizeof(struct timeval));
 					(*time_udp).tv_sec = 5;
 					(*time_udp).tv_usec = 0;
 					time_flag = 0;
 				}
+				//leave is performed correctly
 				else if(n == -7){
 					close(fd_server_tcp);
 					fd_server_tcp = -1;
 					printf("Server leaved ring successfully\n");
 					continue;
 				} 
+				//exit is performed correctly
 				else if(n == -8){
 					printf("Server leaved app successfully\n");
 					running = false;
@@ -131,6 +142,7 @@ int main(int argc, char *argv[]){
 					if((n = tcp_read(incoming_fd, buffer)) == -1) 
 						running = false;
 					else if (n != 0){	
+						//handles messages from server that are not direcly connected with server
 						n = message_incoming(buffer, incoming_fd, &flag_pred_out, udp_addr, fd_server_udp, &waiting_udp);
 						if (n == -1) running = false;
 					
@@ -139,8 +151,9 @@ int main(int argc, char *argv[]){
 						//reset the buffer for further reading
 						memset(buffer, 0, strlen(buffer));
 					}
+					//when returns 0 connection was closed by peer and closes as well
 					else{
-						close(incoming_fd);//connection closed by peer
+						close(incoming_fd);
 						incoming_fd = -1;
 					}
 				}
@@ -152,14 +165,15 @@ int main(int argc, char *argv[]){
 					if((n = tcp_read(succ_fd, buffer)) == -1)
 						running = false;
 					else if (n != 0){
+						//handles messages sent from sucessor
 						n = message_succ(buffer);
 						if (n == -1) running = false;
 
 						//reset the buffer for further reading
 						memset(buffer, 0, strlen(buffer));
 					}
+					//when returns 0 connection was closed by peer and closes as well
 					else{
-						//connection was closed by peer when tcp_read return 0
 						close(succ_fd);
 						server_state.succ_fd = -1;
 						reconnection_succ();
@@ -174,14 +188,15 @@ int main(int argc, char *argv[]){
 						running = false;
 
 					else if (n != 0){
+						//handles messages sent from predecessor
 						n = message_pred(buffer);
 						if (n == -1) running = false;
 
 						//reset the buffer for further reading
 						memset(buffer, 0, strlen(buffer));
 					}
+					//when returns 0 connection was closed by peer and closes as well
 					else{
-						//connection was closed by peer when tcp_read return 0
 						close(pred_fd);
 						server_state.pred_fd = -1;
 						flag_pred_out = 1;
@@ -210,8 +225,8 @@ int main(int argc, char *argv[]){
 					continue;
 				} 
 				
+				//when EKEY is sent as answer to the previous sendto timer stops 
 				if(time_udp != NULL){
-					//when EKEY is sent as answer to the previous sendto timer stops 
 					free(time_udp);
 					time_udp = NULL;
 					time_flag = 0;
@@ -226,14 +241,24 @@ int main(int argc, char *argv[]){
 				//reset the buffer for further reading
 				memset(buffer, 0, strlen(buffer));
 			}
+			//resend message if package loss and reconect completed
+			if(lost_message.resent == 1 && lost_message.ready == 1){
+				decode_fd();
+				n = tcp_write(lost_message.fd, lost_message.message);
+				if (n > 0){
+					lost_message.resent = 0;
+					lost_message.ready = 0;
+				}
+			}
 		}
 		else{
 			if(time_flag == 0){
         		printf("error: No data within 5 seconds message will be resend\n");
 
+				//resends the last udp message sent in case it's lost
 				retval = interface_utilizador(last_message, IP, port, &fd_server_udp, &fd_server_tcp);
 				
-				//waits more 5 seconds
+				//waits 5 more seconds
 				(*time_udp).tv_sec = 10;
 				time_flag = 1;
 			}
@@ -244,7 +269,7 @@ int main(int argc, char *argv[]){
 		}
 	}
 
-
+	//closes and free's everything
 	close(fd_server_udp);
 	if (incoming_fd != -1) close(incoming_fd);
 	if (fd_server_udp != -1) close(fd_server_tcp);

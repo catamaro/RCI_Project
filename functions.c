@@ -8,7 +8,10 @@ int message_incoming(char* message, int incoming_fd, int* flag_pred_out, struct 
 	if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "NEW") == 0)){
 
         if(sscanf(message, "%s %d %s %s", buffer, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 4){
+			//when server is alone on the ring
 			if(server_state.pred_fd == -1){
+				//simpler connections are made because there is only one connection
+				//to avoid double messages when sucessor is the same as predecessor
 				server_state.succ_fd = TCP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP);
 				send_message_tcp(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF", 0);
 				server_state.succ_key = auxiliar.succ_key;
@@ -16,12 +19,12 @@ int message_incoming(char* message, int incoming_fd, int* flag_pred_out, struct 
 				strcpy(server_state.succ_TCP, auxiliar.succ_TCP);
 			}
 			else{
-                //TCP connection sent do predecessor for update
+                //TCP connection sent to predecessor for update
 				send_message_tcp(server_state.pred_fd, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP, "NEW", 0);
 			}
-			//Update self predecessor to new server
+			//update self predecessor to new server
 			server_state.pred_fd = incoming_fd;
-			//TCP connection sent do new server for update
+			//TCP connection sent to new server for update
 			send_message_tcp(incoming_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC", 0);
         }
 		else{
@@ -30,8 +33,10 @@ int message_incoming(char* message, int incoming_fd, int* flag_pred_out, struct 
 		}
 	}
 	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "SUCCCONF") == 0)){
-		
+		//update self predecessor to new server
 		server_state.pred_fd = incoming_fd;
+		//when predecessor of server exits predecessor is also updated and SUCC is sent for new predecessor
+		//to update his second sucessor
 		if(*flag_pred_out == 1){
 			send_message_tcp(incoming_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC", 0);
 			*flag_pred_out = 0;
@@ -40,10 +45,12 @@ int message_incoming(char* message, int incoming_fd, int* flag_pred_out, struct 
 	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "KEY") == 0)){
 
 		if(sscanf(message, "%s %d %d %s %s", buffer, &search_key, &auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP) == 5 && *udp_find == 0){
+			//KEY is received and is a TCP initiated find shows the answer
 			printf("Key %d is stored on server -> key: %d   IP: %s   Port: %s\n", search_key, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP);
 			close(incoming_fd);
 		}
 		else if(sscanf(message, "%s %d %d %s %s", buffer_2, &search_key, &auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP) == 5 && *udp_find == 1){				
+			//KEY is received and is a UDP initiated find sends answer threw UDP
 			udp_addrlen = sizeof(udp_addr);
 			send_message_udp(fd_server_udp, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "EKEY", search_key, (struct sockaddr*)&udp_addr, udp_addrlen);
 
@@ -131,6 +138,8 @@ int message_udp(char *message, struct sockaddr_in udp_addr, char *IP, char *port
 		}
 	}
 	else if (sscanf(message, "%s %d %d %s %s", buffer, &auxiliar.node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5 && strcmp(buffer, "EKEY") == 0){
+		//when EKEY is a valid answer: entering key != sucessor where is supose to enter
+		//sentry is performed on the entering server
 		if(auxiliar.succ_key != auxiliar.node_key){
 			sprintf(buffer, "%s %d %d %s %s\n", "sentry", auxiliar.node_key, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP);
 
@@ -166,6 +175,10 @@ int succ_SUCC(char* message){
 		printf("error: sscanf did not received the correct SUCC message\n");
 		return -1;
 	}	
+	
+	if(lost_message.resent == 1){
+		lost_message.ready = 1;
+	}
 
 	return 0;
 }
@@ -209,12 +222,16 @@ int succ_FND(char* message){
 	if(sscanf(message, "%s %d %d %s %s", buffer, &search_key, &auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP) == 5){
 		dis_act = server_state.node_key-search_key;
 		dis_succ = server_state.succ_key-search_key;
+
+		//logic of distances
 		if(dis_succ < 0) dis_succ += N;
 		if(dis_act < 0) dis_act += N;
 
+		//if key is not found on the sucessor find continues to the next one
 		if(dis_succ > dis_act){
 			send_message_tcp(server_state.succ_fd, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "FND", search_key);
 		}
+		//key is found on the server sucessor and TCP connection is made
 		else{
 			auxiliar.succ_fd = TCP_CLIENT(auxiliar.node_IP, auxiliar.node_TCP);
 			if(auxiliar.succ_fd != -1){
@@ -250,4 +267,11 @@ int reconnection_succ(){
 	strcpy(server_state.succ_TCP, server_state.succ2_TCP);
 	
 	return 0;
+}
+
+void decode_fd(){
+
+	if(strcmp(lost_message.encode_fd, "server_state.succ_fd") == 0){
+		lost_message.fd = server_state.succ_fd;
+	}
 }
