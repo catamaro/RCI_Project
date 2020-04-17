@@ -14,7 +14,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdbool.h>
-#include <unistd.h>
 
 #define max(A,B) ((A)>=(B)?(A):(B))
 
@@ -28,8 +27,7 @@ typedef struct message
     int ready;
     char encode_fd[128];
     int fd;
-
-} message;
+}
 
 message lost_message;
 

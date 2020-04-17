@@ -19,7 +19,7 @@ int message_incoming(char* message, int incoming_fd, int* flag_pred_out, struct 
 				strcpy(server_state.succ_TCP, auxiliar.succ_TCP);
 			}
 			else{
-                //TCP connection sent to predecessor for update
+        //TCP connection sent to predecessor for update
 				send_message_tcp(server_state.pred_fd, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP, "NEW", 0);
 			}
 			//update self predecessor to new server
