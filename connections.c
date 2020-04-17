@@ -76,7 +76,7 @@ int TCP_SERVER (char* port){
     if(n == -1){
         perror("error: on tcp bind");
         printf("please try and wait until tcp address is complety reset\n");
-	    freeaddrinfo(res);
+	freeaddrinfo(res);
         return -1;
     }
 
