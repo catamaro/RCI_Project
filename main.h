@@ -53,10 +53,10 @@ int sentry(char* comando_utilizador, char* IP, char* port);
 int find(char* comando_utilizador);
 void leave();
 int entry(char* comando_utilizador, char* IP, char* port, int *fd_server_udp);
-void send_message(int fd, int node_key, char* IP, char* port, char* comand);
-void send_find_message(int fd, int node_key, char* IP, char* port, char* comand, int search_key);
+void send_message_tcp(int fd, int node_key, char* IP, char* port, char* comand, int search_key);
 void send_message_udp(int fd, int node_key, char* IP, char* port, char* comand, int search_key, struct sockaddr *addr, socklen_t addrlen);
 int tcp_read(int fd, char* buffer);
+int tcp_write(int fd, char* message);
 
 //functions of functions.c
 int message_incoming(char* message, int incoming_fd, int* flag_pred_out, struct sockaddr_in udp_addr, int fd_server_udp, int *flag_udp);

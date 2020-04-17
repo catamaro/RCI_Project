@@ -10,19 +10,19 @@ int message_incoming(char* message, int incoming_fd, int* flag_pred_out, struct 
         if(sscanf(message, "%s %d %s %s", buffer, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 4){
 			if(server_state.pred_fd == -1){
 				server_state.succ_fd = TCP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP);
-				send_message(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF");
+				send_message_tcp(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF", 0);
 				server_state.succ_key = auxiliar.succ_key;
 				strcpy(server_state.succ_IP, auxiliar.succ_IP); 
 				strcpy(server_state.succ_TCP, auxiliar.succ_TCP);
 			}
 			else{
                 //TCP connection sent do predecessor for update
-				send_message(server_state.pred_fd, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP, "NEW");
+				send_message_tcp(server_state.pred_fd, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP, "NEW", 0);
 			}
 			//Update self predecessor to new server
 			server_state.pred_fd = incoming_fd;
 			//TCP connection sent do new server for update
-			send_message(incoming_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC");
+			send_message_tcp(incoming_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC", 0);
         }
 		else{
 			printf("error: NEW message is not correct\n");
@@ -33,7 +33,7 @@ int message_incoming(char* message, int incoming_fd, int* flag_pred_out, struct 
 		
 		server_state.pred_fd = incoming_fd;
 		if(*flag_pred_out == 1){
-			send_message(incoming_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC");
+			send_message_tcp(incoming_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC", 0);
 			*flag_pred_out = 0;
 		}
 	}
@@ -119,7 +119,7 @@ int message_udp(char *message, struct sockaddr_in udp_addr, char *IP, char *port
 			}
 			//sends find message to sucessor
 			else if(server_state.succ_fd != -1){
-				send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);
+				send_message_tcp(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);
 
 				//when EFND is received server waits for EKEY answet thus it's a udp find
 				*udp_find = 1;
@@ -190,8 +190,8 @@ int succ_NEW(char* message){
 			strcpy(server_state.succ_IP, auxiliar.succ_IP); 
 			strcpy(server_state.succ_TCP, auxiliar.succ_TCP);
 
-			send_message(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF");
-			send_message(server_state.pred_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC");
+			send_message_tcp(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF", 0);
+			send_message_tcp(server_state.pred_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC", 0);
 		}            
 	}
 	else{
@@ -213,12 +213,12 @@ int succ_FND(char* message){
 		if(dis_act < 0) dis_act += N;
 
 		if(dis_succ > dis_act){
-			send_find_message(server_state.succ_fd, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "FND", search_key);
+			send_message_tcp(server_state.succ_fd, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "FND", search_key);
 		}
 		else{
 			auxiliar.succ_fd = TCP_CLIENT(auxiliar.node_IP, auxiliar.node_TCP);
 			if(auxiliar.succ_fd != -1){
-				send_find_message(auxiliar.succ_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "KEY", search_key);
+				send_message_tcp(auxiliar.succ_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "KEY", search_key);
 			}
 		}
 	}
@@ -235,8 +235,8 @@ int reconnection_succ(){
 		auxiliar.succ_fd = TCP_CLIENT(server_state.succ2_IP, server_state.succ2_TCP);
 		if(auxiliar.succ_fd != -1){	
 			server_state.succ_fd = auxiliar.succ_fd;
-			send_message(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF");
-			send_message(server_state.pred_fd, server_state.succ2_key, server_state.succ2_IP, server_state.succ2_TCP, "SUCC");
+			send_message_tcp(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF", 0);
+			send_message_tcp(server_state.pred_fd, server_state.succ2_key, server_state.succ2_IP, server_state.succ2_TCP, "SUCC", 0);
 		}
 		else{
 			printf("error: TCP connection failed\n");

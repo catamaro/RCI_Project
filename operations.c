@@ -157,7 +157,7 @@ int sentry(char* comando_utilizador, char* IP, char* port){
 		server_state.succ_fd = TCP_CLIENT(server_state.succ_IP, server_state.succ_TCP);
 		
 		//TCP connection sent do sucessor for update
-		send_message(server_state.succ_fd, node_key, IP, port, "NEW");
+		send_message_tcp(server_state.succ_fd, node_key, IP, port, "NEW", 0);
 	}
 	else{
 		printf("error: command of type sentry <i> <j> <IP_j> <port_j> \n");
@@ -178,7 +178,7 @@ int find(char* comando_utilizador){
 		}
 		
 		if(server_state.succ_fd != -1){
-			send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);	
+			send_message_tcp(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);	
 		}
 		else{
 			printf("Key %d is stored on server -> key: %d   IP: %s   Port: %s\n", search_key, server_state.node_key, server_state.node_IP, server_state.node_TCP);
@@ -235,51 +235,19 @@ void leave(){
 	strcpy(server_state.succ2_TCP, "0000");
 }
 
-void send_message(int fd, int node_key, char* IP, char* port, char* comand){
+void send_message_tcp(int fd, int node_key, char* IP, char* port, char* comand, int search_key){
 
-	size_t n, nleft, nwritten;
-	char message[128], *ptr;
+	size_t n;
+	char message[128];
 
 	if(strcmp(comand, "SUCCCONF") == 0) 
-		ptr = strcpy(message, "SUCCCONF\n");
-	else{
+		strcpy(message, "SUCCCONF\n");
+	else if(strcmp(comand, "KEY") == 0 || strcmp(comand, "FND") == 0)
+		sprintf(message, "%s %d %d %s %s\n", comand, search_key, node_key, IP, port);
+	else
 		sprintf(message, "%s %d %s %s\n", comand, node_key, IP, port);
-		ptr = message;
-	}
 	
-	n = strlen(message);
-	nleft = n;
-
-	while(nleft > 0){
-		nwritten = write(fd,ptr,nleft); 
-		if(nwritten <= 0){
-			printf("error: could not perform write\n");
-			exit(1); 
-		}
-		nleft -= nwritten;
-		ptr += nwritten;
-	}
-}
-
-void send_find_message(int fd, int node_key, char* IP, char* port, char* comand, int search_key){
-
-	size_t n, nleft, nwritten;
-	char message[128], *ptr;
-
-	sprintf(message, "%s %d %d %s %s\n", comand, search_key, node_key, IP, port);
-	
-	n = strlen(message);
-	nleft = n;
-
-	while(nleft > 0){
-		nwritten = write(fd,message,nleft); 
-		if(nwritten <= 0){
-			printf("error: could not perform write\n");
-			exit(1); 
-		}
-		nleft -= nwritten;
-		ptr += nwritten;
-	}
+	n = tcp_write(fd, message);
 }
 
 void send_message_udp(int fd, int node_key, char* IP, char* port, char* comand, int search_key, struct sockaddr *addr, socklen_t addrlen){
@@ -335,6 +303,28 @@ int tcp_read(int fd, char* message){
 
 	free(aux);
 	free(buffer);
+
+	return n;
+}
+
+int tcp_write(int fd, char* message){
+	size_t n, nleft, nwritten;
+	char *ptr;
+
+	ptr = message;
+
+	n = strlen(message);
+	nleft = n;
+
+	while(nleft > 0){
+		nwritten = write(fd,message,nleft); 
+		if(nwritten <= 0){
+			printf("error: could not perform write\n");
+			return -1; 
+		}
+		nleft -= nwritten;
+		ptr += nwritten;
+	}
 
 	return n;
 }
