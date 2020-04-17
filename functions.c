@@ -1,15 +1,16 @@
 #include "main.h"
 
-int message_incoming_fd(char* message, int incoming_fd, int* flag_pred_out){
-	char buffer[128];
+int message_incoming(char* message, int incoming_fd, int* flag_pred_out, struct sockaddr_in udp_addr, int fd_server_udp, int *udp_find){
+	char buffer[128], buffer_2[128];
 	int search_key;
+	socklen_t udp_addrlen; 
 
-	if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "NEW")==0)){
-		
+	if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "NEW") == 0)){
+
         if(sscanf(message, "%s %d %s %s", buffer, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 4){
 			if(server_state.pred_fd == -1){
 				server_state.succ_fd = TCP_CLIENT(auxiliar.succ_IP, auxiliar.succ_TCP);
-				send_message(server_state.succ_fd, 0, NULL, NULL, "SUCCCONFIG");
+				send_message(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF");
 				server_state.succ_key = auxiliar.succ_key;
 				strcpy(server_state.succ_IP, auxiliar.succ_IP); 
 				strcpy(server_state.succ_TCP, auxiliar.succ_TCP);
@@ -18,14 +19,18 @@ int message_incoming_fd(char* message, int incoming_fd, int* flag_pred_out){
                 //TCP connection sent do predecessor for update
 				send_message(server_state.pred_fd, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP, "NEW");
 			}
-				//Update self predecessor to new server
-                server_state.pred_fd = incoming_fd;
-				//TCP connection sent do new server for update
-				send_message(incoming_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC");
+			//Update self predecessor to new server
+			server_state.pred_fd = incoming_fd;
+			//TCP connection sent do new server for update
+			send_message(incoming_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC");
         }
-
+		else{
+			printf("error: NEW message is not correct\n");
+			return -1;
+		}
 	}
-	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "SUCCCONFIG")==0)){
+	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "SUCCCONF") == 0)){
+		
 		server_state.pred_fd = incoming_fd;
 		if(*flag_pred_out == 1){
 			send_message(incoming_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC");
@@ -33,9 +38,21 @@ int message_incoming_fd(char* message, int incoming_fd, int* flag_pred_out){
 		}
 	}
 	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "KEY") == 0)){
-		if(sscanf(message, "%s %d %d %s %s", buffer, &search_key, &auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP) == 5){
+
+		if(sscanf(message, "%s %d %d %s %s", buffer, &search_key, &auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP) == 5 && *udp_find == 0){
 			printf("Key %d is stored on server -> key: %d   IP: %s   Port: %s\n", search_key, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP);
 			close(incoming_fd);
+		}
+		else if(sscanf(message, "%s %d %d %s %s", buffer_2, &search_key, &auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP) == 5 && *udp_find == 1){				
+			udp_addrlen = sizeof(udp_addr);
+			send_message_udp(fd_server_udp, auxiliar.node_key, auxiliar.node_IP, auxiliar.node_TCP, "EKEY", search_key, (struct sockaddr*)&udp_addr, udp_addrlen);
+
+			close(incoming_fd);
+			*udp_find = 0;
+		}
+		else{
+			printf("error: incorrect KEY message\n");
+			return -1;
 		}
 	}
 	else {
@@ -45,16 +62,19 @@ int message_incoming_fd(char* message, int incoming_fd, int* flag_pred_out){
 	return 0;
 }
 
-int message_succ_fd(char* message){
+int message_succ(char* message){
     char buffer[128];
+	int n;
 
     if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "SUCC") == 0)){
-		succ_SUCC(message);
+		n = succ_SUCC(message);
+		if(n == -1) return -1;
 	}
-	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "NEW")==0)){
-		succ_NEW(message);
+	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "NEW") == 0)){
+		n = succ_NEW(message);
+		if(n == -1) return -1;
 	}
-	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "SUCCCONFIG") == 0)){
+	else if (sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "SUCCCONF") == 0)){
 		server_state.pred_fd = server_state.succ_fd;
 	}
 	else{
@@ -65,11 +85,13 @@ int message_succ_fd(char* message){
 	return 0;
 }
 
-int message_pred_fd(char* message){
+int message_pred(char* message){
     char buffer[128];
+	int n;
 
-    if (sscanf(message, "%s", buffer) == 1 && strcmp(buffer, "FND") == 0 ){
-		succ_FND(message);
+    if (sscanf(message, "%s", buffer) == 1 &&  strcmp(buffer, "FND") == 0){
+		n = succ_FND(message);
+		if(n == -1) return -1;
 	}
 	else{
 		printf("error: incorrect message from the predecessor\n");
@@ -79,21 +101,55 @@ int message_pred_fd(char* message){
 	return 0;
 }
 
-int message_udp(char* message){
+int message_udp(char *message, struct sockaddr_in udp_addr, char *IP, char *port, int *udp_find, int fd_server_udp){
 	char buffer[128];
-	int search_key;
+	int search_key,n;
+	socklen_t udp_addrlen;
 
 	if(sscanf(message, "%s", buffer) == 1 && (strcmp(buffer, "EFND") == 0)){
+		//checks for correct message
 		if(sscanf(message, "%s %d", buffer, &search_key) == 2){
-			send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);
+			//if server is not on the ring message is not accepted
+			if (server_state.node_key == -1) return -2;
+
+			//ring with only one server, already has the key
+			if (server_state.succ_fd == -1){
+				udp_addrlen = sizeof(udp_addr);
+				send_message_udp(fd_server_udp, server_state.node_key, server_state.node_IP, server_state.node_TCP, "EKEY", search_key, (struct sockaddr*)&udp_addr, udp_addrlen);
+			}
+			//sends find message to sucessor
+			else if(server_state.succ_fd != -1){
+				send_find_message(server_state.succ_fd, server_state.node_key, server_state.node_IP, server_state.node_TCP, "FND", search_key);
+
+				//when EFND is received server waits for EKEY answet thus it's a udp find
+				*udp_find = 1;
+			}
+		}		
+		else{
+			printf("error: incorrect message from udp connection\n");
+			return -1;
+		}
+	}
+	else if (sscanf(message, "%s %d %d %s %s", buffer, &auxiliar.node_key, &auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP) == 5 && strcmp(buffer, "EKEY") == 0){
+		if(auxiliar.succ_key != auxiliar.node_key){
+			sprintf(buffer, "%s %d %d %s %s\n", "sentry", auxiliar.node_key, auxiliar.succ_key, auxiliar.succ_IP, auxiliar.succ_TCP);
+
+			n = sentry(buffer, IP, port);
+			if (n == -1) return -1;
+			else printf("Server entered successfully on the ring\n");
+		}
+		else{
+			printf("error: could not perform entry because the key used is already on the ring\n");
+			return -1;
 		}
 	}
 	else{
-		printf("error: incorrect message from udp connection\n");
-		return -1;
+		printf("error: incorrect udp message\n");
+		return -1; 
 	}
 
 	return 0;
+
 }
 
 int succ_SUCC(char* message){
@@ -134,8 +190,7 @@ int succ_NEW(char* message){
 			strcpy(server_state.succ_IP, auxiliar.succ_IP); 
 			strcpy(server_state.succ_TCP, auxiliar.succ_TCP);
 
-			send_message(server_state.succ_fd, 0, NULL, NULL, "SUCCCONFIG");
-			delay(1000);
+			send_message(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF");
 			send_message(server_state.pred_fd, server_state.succ_key, server_state.succ_IP, server_state.succ_TCP, "SUCC");
 		}            
 	}
@@ -175,20 +230,12 @@ int succ_FND(char* message){
 	return 0;
 }
 
-
-void delay(int m_seconds){
-
-	clock_t start_time = clock();
-
-	while (clock() < start_time + m_seconds);
-}
-
 int reconnection_succ(){
 	if(server_state.node_key != server_state.succ2_key){
 		auxiliar.succ_fd = TCP_CLIENT(server_state.succ2_IP, server_state.succ2_TCP);
 		if(auxiliar.succ_fd != -1){	
 			server_state.succ_fd = auxiliar.succ_fd;
-			send_message(server_state.succ_fd, 0, NULL, NULL, "SUCCCONFIG");
+			send_message(server_state.succ_fd, 0, NULL, NULL, "SUCCCONF");
 			send_message(server_state.pred_fd, server_state.succ2_key, server_state.succ2_IP, server_state.succ2_TCP, "SUCC");
 		}
 		else{
