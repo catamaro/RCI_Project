@@ -24,7 +24,7 @@ int TCP_CLIENT (char* IP, char* port){
 	if(sigaction(SIGPIPE,&act,NULL) == -1) exit(0);
 
     n = getaddrinfo (IP, port, &hints, &res); 
-    if(n !=0 ){
+    if(n != 0 ){
         perror("error: on tcp getaddrinfo");
         exit(1);
     }

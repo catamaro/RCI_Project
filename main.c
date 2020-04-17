@@ -226,6 +226,10 @@ int main(int argc, char *argv[]){
 				//reset the buffer for further reading
 				memset(buffer, 0, strlen(buffer));
 			}
+			if(lost_message.resent == 1){
+				tcp_write(lost_message.fd, lost_message.message);
+				lost_message.resent = 0;
+			}
 		}
 		else{
 			if(time_flag == 0){
