@@ -27,7 +27,7 @@ typedef struct message
     int ready;
     char encode_fd[128];
     int fd;
-}
+} message;
 
 message lost_message;
 
