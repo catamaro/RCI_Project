@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "client.h": "c",
-        "main.h": "c",
-        "inet.h": "c",
-        "time.h": "c",
-        "stdbool.h": "c"
-    }
-}
