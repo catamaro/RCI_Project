@@ -1,47 +1,27 @@
-# Tabela	de	Chaves Distribuída (RCI_Project)
-  Uma tabela de chaves distribuída é uma versão simplificada de uma tabela de hash 
-distribuída. Uma tabela de hash é uma estrutura de dados constituída por pares (chave,
-valor), em que chave é um número inteiro e valor referencia um objeto associado à chave.
-Cada valor é pesquisado pela sua chave. Por exemplo, as chaves podem ser números de
-cartões de cidadão e os valores podem ser registos com o nome, data de nascimento, sexo
-e morada dos portadores dos cartões.
+# Distributed Key Table
+ 
+A distributed key table is a simplified version of a distributed hash table. A hash table is a data structure consisting of pairs (key, value), where the key is an integer and the value is a reference to an object associated with that key. Each value is searched for its key. For example, keys can be citizen cards numbers and the values can be records with the name, date of birth, gender and address of the card holders.
 
-  Geralmente, o espaço de chaves é demasiado grande para uma pesquisa eficiente.
-Recorre-se então a uma função de hash que mapeia chaves arbitrárias em outras chaves
-pertencentes a um conjunto pequeno de números inteiros.
+Generally, the key space is too large for efficient searching. One then resorts to a hash function that maps arbitrary keys into other keys belonging to a small set of integers.
 
-  Numa tabela de hash distribuída, os pares (chave, valor) são repartidos por vários
-servidores por forma a que a pesquisa de uma chave seja eficiente e a entrada e a saída de
-um servidor não altere os pares (chave, valor) associados à maioria dos servidores. As
-tabelas de hash distribuídas são usadas, entre outros, em redes de distribuição de
-conteúdos.
+In a distributed hash table, the pairs (key, value) are distributed among several servers so that the search of a key is efficient and the entry and exit of a server does not change the pairs (key, value) associated with most servers. 
 
-  Uma tabela de chaves distribuída compreende as funções de pesquisa de uma chave,
-entrada e saída de servidores, mas ao contrário de uma tabela de hash distribuída
-propriamente dita, dispensa a recuperação, atualização e migração entre servidores dos
-valores associados às chaves. 
+This project creates such structure in a ring formation where the servers communicate through their successor's.
 
-## Interface de Utilizador
+## User Interface
 
-A interface de utilizador consiste nos seguintes comandos:
+The user interface enables the following commands:
 
-• new i - Criação de um novo anel composto exclusivamente pelo servidor i.
+• new i - Creation of a new ring composed exclusively by the i-server.
 
-• entry i boot boot.IP boot.TCP - Entrada do servidor i no anel ao qual pertence o servidor boot com endereço IP
-boot.IP e porto boot.TCP.
+• entry i boot boot.IP boot.TCP - Server i enters the ring to which the _boot_ server belongs with address boot.IP and port boot.TCP
 
-• sentry i succi succi.IP succi.TCP - Entrada do servidor i no anel no qual o servidor succi com endereço IP
-succi.IP e porto succi.TCP será o sucessor do servidor i. Este comando
-pressupõe que se sabe que a chave i não é usada por um servidor pertencente ao
-anel e que succi será o sucessor do servidor i. Ele serve para construir um anel
-um servidor à vez sem necessitar da pesquisa de chaves.
+• sentry i succi succi.IP succi.TCP - Entry of server i into the ring in which server succi with IP address succi.IP and port succi.TCP will be the successor of server i. This command assumes that it is known that the key i is not used by a server belonging to the ring and that succi will be the successor of server i. It is used to build a ring, a server at a time, without the key search.
 
-• leave - Saída do servidor do anel.
+• leave - Server leaves the ring.
 
-• show - Mostra do estado do servidor, incluindo a sua chave, endereço IP e porto, bem
-como os valores correspondentes do seu sucessor e segundo sucessor.
+• show - Shows the server status, including its key, IP address and port, as well as the corresponding values of its successor and second successor.
 
-• find k - Pesquisa do servidor que armazena a chave k, com a apresentação da sua chave,
-endereço IP e porto.
+• find k - Searchs the server storing the key k, with the presentation of its key, IP address and port.
 
-• exit - Fecho da aplicação.
+• exit - Application closes.
